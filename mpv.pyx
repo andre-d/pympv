@@ -224,6 +224,11 @@ cdef class Context(object):
         mpv_resume(self._ctx)
 
     @_errors
+    def request_event(self, event, enable):
+        enable = 1 if enable else 0
+        return mpv_request_event(self._ctx, event, enable)
+
+    @_errors
     def set_log_level(self, loglevel):
         loglevel = loglevel.encode('utf-8')
         return mpv_request_log_messages(self._ctx, <const char*>loglevel)
