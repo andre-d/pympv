@@ -206,6 +206,8 @@ class MPVError(Exception):
             e = _strdec(mpv_error_string(e))
         Exception.__init__(self, e)
 
+_callbacks = {}
+
 cdef class Context(object):
     cdef mpv_handle *_ctx
 
@@ -270,7 +272,7 @@ cdef class Context(object):
 
     @_errors
     def command(self, *cmdlist, async=False, int data=0):
-        lsize = (len(cmdlist) + 1) * cython.sizeof(cython.pp_char)
+        lsize = (len(cmdlist) + 1) * cython.sizeof(pp_char)
         cdef const char** cmds = <const char**>malloc(lsize)
         if not cmds:
             raise MemoryError
@@ -316,31 +318,35 @@ cdef class Context(object):
         cdef mpv_format format = self._format_for(value)
         cdef void* v = self._prep_native_value(value, format)
         if not async:
-            return mpv_set_property(
+            err = mpv_set_property(
                 self._ctx,
                 <const char*>prop,
                 format,
                 v
             )
-        return mpv_set_property_async(
+        err = mpv_set_property_async(
             self._ctx,
             data,
             <const char*>prop,
             format,
             v
         )
+        free(v)
+        return err
 
     @_errors
     def set_option(self, prop, value=True):
         prop = prop.encode('utf-8')
         cdef mpv_format format = self._format_for(value)
         cdef void* v = self._prep_native_value(value, format)
-        return mpv_set_option(
+        err = mpv_set_option(
             self._ctx,
             <const char*>prop,
             format,
             v
         )
+        free(v)
+        return err
 
     @_errors
     def initialize(self):
@@ -350,10 +356,25 @@ cdef class Context(object):
         timeout = timeout if timeout is not None else -1
         return Event()._init(mpv_wait_event(self._ctx, timeout))
 
+    def wakeup(self):
+        mpv_wakeup(self._ctx)
+
+    def set_wakeup_callback(self, callback, data):
+        cdef char* name = self.name
+        _callbacks[self.name] = (callback, data)
+        mpv_set_wakeup_callback(self._ctx, c_callback, <void*>name)
+
     def __cinit__(self):
         self._ctx = mpv_create()
         if not self._ctx:
             raise MPVError('Context creation error')
+        _callbacks[self.name] = (None, None)
 
     def __dealloc__(self):
+        del _callbacks[self.name]
         mpv_destroy(self._ctx)
+
+cdef void c_callback(void* d):
+    name = <char*>d
+    cb, data = _callbacks[name]
+    cb(data) if cb else None
