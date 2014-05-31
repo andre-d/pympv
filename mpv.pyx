@@ -49,57 +49,27 @@ class EOFReasons:
     quit = 3
 
 cdef class EndOfFileReached(object):
-    cdef mpv_event_end_file *_eof
-
-    @property
-    def reason(self):
-        return self._eof.reason
-
-    def __cinit__(self):
-        self._eof = NULL
+    cdef public object reason
 
     cdef _init(self, mpv_event_end_file* eof):
-        self._eof = eof
+        self.reason = eof.reason
         return self
 
 cdef class InputDispatch(object):
-    cdef mpv_event_script_input_dispatch *_input
-
-    @property
-    def arg0(self):
-        return self._input.arg0
-
-    @property
-    def type(self):
-        return _strdec(self._input.type)
-
-    def __cinit__(self):
-        self._input = NULL
+    cdef public object arg0, type
 
     cdef _init(self, mpv_event_script_input_dispatch* input):
-        self._input = input
+        self.arg0 = input.arg0
+        self.type = _strdec(input.type)
         return self
 
 cdef class LogMessage(object):
-    cdef mpv_event_log_message *_msg
-
-    @property
-    def prefix(self):
-        return _strdec(self._msg.prefix)
-
-    @property
-    def level(self):
-        return _strdec(self._msg.level)
-
-    @property
-    def text(self):
-        return _strdec(self._msg.text)
-
-    def __cinit__(self):
-        self._msg = NULL
+    cdef public object prefix, level, text
 
     cdef _init(self, mpv_event_log_message* msg):
-        self._msg = msg
+        self.level = _strdec(msg.level)
+        self.prefix = _strdec(msg.level)
+        self.text = _strdec(msg.level)
         return self
 
 cdef _convert_value(void* data, mpv_format format):
@@ -114,47 +84,22 @@ cdef _convert_value(void* data, mpv_format format):
     return None
 
 cdef class Property(object):
-    cdef mpv_event_property* _property
-
-    @property
-    def name(self):
-        return _strdec(self._property.name)
-
-    def data(self):
-        return _convert_value(self._property.data, self._property.format)
-
-    def __cinit_(self):
-        self._property = NULL
-
+    cdef public object name, data
+    
     cdef _init(self, mpv_event_property* prop):
-        self._property = prop
+        self.name = _strdec(prop.name)
+        self.data = _convert_value(prop.data, prop.format)
         return self
 
 cdef class Event(object):
-    cdef mpv_event *_event
-
-    def __cinit__(self):
-        self._event = NULL
-
-    @property
-    def error(self):
-        return self._event.error
+    cdef public object id, data, reply_userdata, error
 
     @property
     def error_str(self):
         return _strdec(mpv_error_string(self.error))
 
-    @property
-    def id(self):
-        return self._event.event_id
-
-    @property
-    def reply_userdata(self):
-        return self._event.reply_userdata
-
-    @property
-    def data(self):
-        cdef void* data = self._event.data
+    cdef _data(self, mpv_event* event):
+        cdef void* data = event.data
         cdef mpv_event_client_message* climsg
         if self.id == MPV_EVENT_GET_PROPERTY_REPLY:
             return Property()._init(<mpv_event_property*>data)
@@ -179,10 +124,13 @@ cdef class Event(object):
 
     @property
     def name(self):
-        return _strdec(mpv_event_name(self._event.event_id))
+        return _strdec(mpv_event_name(self.id))
 
     cdef _init(self, mpv_event* event):
-        self._event = event
+        self.id = event.event_id
+        self.data = self._data(event)
+        self.reply_userdata = event.reply_userdata
+        self.error = event.error
         return self
 
 def errors(infn):
