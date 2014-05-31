@@ -108,9 +108,23 @@ cdef _convert_node_value(mpv_node node):
 
 cdef _convert_value(void* data, mpv_format format):
     cdef mpv_node node
+    cdef mpv_node_list nodelist
     if format == MPV_FORMAT_NODE:
         node = (<mpv_node*>data)[0]
         return _convert_node_value(node)
+    elif format == MPV_FORMAT_NODE_ARRAY:
+        nodelist = (<mpv_node_list*>data)[0]
+        values = []
+        for i in range(nodelist.num):
+            values.append(_convert_node_value(nodelist.values[i]))
+        return values
+    elif format == MPV_FORMAT_NODE_MAP:
+        nodelist = (<mpv_node_list*>data)[0]
+        values = {}
+        for i in range(nodelist.num):
+            value = _convert_node_value(nodelist.values[i])
+            values[nodelist.keys[i]] = value
+        return values
     elif format == MPV_FORMAT_STRING:
         return _strdec(((<char**>data)[0]))
     elif format == MPV_FORMAT_FLAG:
