@@ -275,10 +275,8 @@ cdef class Context(object):
         mpv_free_node_contents(&result)
         return v
 
-    FLAG_SET = object()
     @errors
-    def set_option(self, prop, value=Context.FLAG_SET):
-        value = value if value is not Context.FLAG_SET else ''
+    def set_option(self, prop, value=True):
         cdef mpv_format format = self._format_for(value)
         value = self._convert_value(value, format)
         prop = prop.encode('utf-8')
