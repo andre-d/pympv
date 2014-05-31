@@ -6,7 +6,7 @@ from client cimport *
 _MPV_C_CLIENT_API_VERSION = 0
 
 if mpv_client_api_version() >> 16 != _MPV_C_CLIENT_API_VERSION:
-    raise ImportError('libmpv version is incorrect') 
+    raise ImportError('libmpv version is incorrect')
 
 _is_py3 = sys.version_info >= (3,)
 _strdec_err = 'surrogateescape' if _is_py3 else 'strict'
@@ -85,7 +85,7 @@ cdef _convert_value(void* data, mpv_format format):
 
 cdef class Property(object):
     cdef public object name, data
-    
+
     cdef _init(self, mpv_event_property* prop):
         self.name = _strdec(prop.name)
         self.data = _convert_value(prop.data, prop.format)
@@ -133,12 +133,12 @@ cdef class Event(object):
         self.error = event.error
         return self
 
-def errors(infn):
-    def fn(*k, **kw):
-        v = infn(*k, **kw)
+def errors(fn):
+    def wrapped(*k, **kw):
+        v = fn(*k, **kw)
         if v < 0:
             raise MPVError(v)
-    return fn
+    return wrapped
 
 class MPVError(Exception):
     def __init__(self, e):
@@ -180,7 +180,7 @@ cdef class Context(object):
             return MPV_FORMAT_DOUBLE
         return MPV_FORMAT_NONE
 
-    def _convert_value(self, value, format):
+    def _prep_native_value(self, value, format):
         if format == MPV_FORMAT_STRING:
             return value.encode('utf-8')
         if format == MPV_FORMAT_FLAG:
@@ -226,7 +226,7 @@ cdef class Context(object):
     @errors
     def set_option(self, prop, value=True):
         cdef mpv_format format = self._format_for(value)
-        value = self._convert_value(value, format)
+        value = self._prep_native_value(value, format)
         prop = prop.encode('utf-8')
         cdef void* v
         cdef char* cv
