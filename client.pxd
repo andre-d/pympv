@@ -89,6 +89,8 @@ cdef extern from "mpv/client.h":
 
     void mpv_destroy(mpv_handle *ctx)
 
+    int mpv_load_config_file(mpv_handle *ctx, const char *filename)
+
     void mpv_suspend(mpv_handle *ctx)
 
     void mpv_resume(mpv_handle *ctx)
@@ -183,6 +185,7 @@ cdef extern from "mpv/client.h":
         MPV_EVENT_SEEK
         MPV_EVENT_PLAYBACK_RESTART
         MPV_EVENT_PROPERTY_CHANGE
+        MPV_EVENT_CHAPTER_CHANGE
 
     const char *mpv_event_name(mpv_event_id event)
 
