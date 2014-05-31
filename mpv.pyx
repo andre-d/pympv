@@ -72,7 +72,22 @@ cdef class LogMessage(object):
         self.text = _strdec(msg.level)
         return self
 
+cdef _convert_node_value(mpv_node node):
+    if node.format == MPV_FORMAT_STRING:
+        return _strdec(node.u.string)
+    elif node.format == MPV_FORMAT_FLAG:
+        return not not int(node.u.flag)
+    elif node.format == MPV_FORMAT_INT64:
+        return int(node.u.int64)
+    elif node.format == MPV_FORMAT_DOUBLE:
+        return float(node.u.double_)
+    return None
+
 cdef _convert_value(void* data, mpv_format format):
+    cdef mpv_node node
+    if format == MPV_FORMAT_NODE:
+        node = (<mpv_node*>data)[0]
+        return _convert_node_value(node)
     if format == MPV_FORMAT_STRING:
         return _strdec(((<char**>data)[0]))
     elif format == MPV_FORMAT_FLAG:
@@ -180,15 +195,26 @@ cdef class Context(object):
             return MPV_FORMAT_DOUBLE
         return MPV_FORMAT_NONE
 
-    def _prep_native_value(self, value, format):
+    cdef void* _prep_native_value(self, value, format):
         if format == MPV_FORMAT_STRING:
-            return value.encode('utf-8')
+            value = value.encode('utf-8')
         if format == MPV_FORMAT_FLAG:
             value = 1 if value else 0
-        return value
+        cdef void* v
+        cdef char* cv
+        cdef uint64_t iv
+        if format == MPV_FORMAT_STRING:
+            cv = <char*>value
+            v = &cv
+        elif format == MPV_FORMAT_NONE:
+            v = NULL
+        else:
+            iv = value
+            v = &iv
+        return v
 
     @errors
-    def command(self, *cmdlist):
+    def command(self, *cmdlist, async=False, int data=0):
         lsize = (len(cmdlist) + 1) * cython.sizeof(cython.pp_char)
         cdef const char** cmds = <const char**>malloc(lsize)
         if not cmds:
@@ -197,9 +223,22 @@ cdef class Context(object):
         for i, cmd in enumerate(cmdlist):
             cmds[i] = <char*>cmd
         cmds[i + 1] = NULL
-        rv = mpv_command(self._ctx, cmds)
+        if not async:
+            rv = mpv_command(self._ctx, cmds)
+        else:
+            rv = mpv_command_async(self._ctx, <uint64_t>data, cmds)
         free(cmds)
         return rv
+
+    @errors
+    def get_property_async(self, prop, int data=0):
+        prop = prop.encode('utf-8')
+        return mpv_get_property_async(
+            self._ctx,
+            data,
+            <const char*>prop,
+            MPV_FORMAT_NODE,
+        )
 
     def get_property(self, prop):
         cdef mpv_node result
@@ -212,33 +251,35 @@ cdef class Context(object):
         )
         if v < 0:
             raise MPVError(v)
-        if result.format == MPV_FORMAT_STRING:
-            v = _strdec(result.u.string)
-        elif result.format == MPV_FORMAT_FLAG:
-            v = not not int(result.u.flag)
-        elif result.format == MPV_FORMAT_INT64:
-            v = int(result.u.int64)
-        elif result.format == MPV_FORMAT_DOUBLE:
-            v = float(result.u.double_)
+        v = _convert_node_value(result)
         mpv_free_node_contents(&result)
         return v
 
     @errors
-    def set_option(self, prop, value=True):
-        cdef mpv_format format = self._format_for(value)
-        value = self._prep_native_value(value, format)
+    def set_property(self, prop, value=True, async=False, int data=0):
         prop = prop.encode('utf-8')
-        cdef void* v
-        cdef char* cv
-        cdef uint64_t iv
-        if format == MPV_FORMAT_STRING:
-            cv = <char*>value
-            v = &cv
-        elif format == MPV_FORMAT_NONE:
-            v = NULL
-        else:
-            iv = value
-            v = &iv
+        cdef mpv_format format = self._format_for(value)
+        cdef void* v = self._prep_native_value(value, format)
+        if not async:
+            return mpv_set_property(
+                self._ctx,
+                <const char*>prop,
+                format,
+                v
+            )
+        return mpv_set_property_async(
+            self._ctx,
+            data,
+            <const char*>prop,
+            format,
+            v
+        )
+
+    @errors
+    def set_option(self, prop, value=True):
+        prop = prop.encode('utf-8')
+        cdef mpv_format format = self._format_for(value)
+        cdef void* v = self._prep_native_value(value, format)
         return mpv_set_option(
             self._ctx,
             <const char*>prop,
