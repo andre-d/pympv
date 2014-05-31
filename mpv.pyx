@@ -16,6 +16,22 @@ def _strdec(s):
     except UnicodeDecodeError:
         return bytes(s)
 
+
+class Errors:
+    success = MPV_ERROR_SUCCESS
+    queue_full = MPV_ERROR_EVENT_QUEUE_FULL
+    nomem = MPV_ERROR_NOMEM
+    uninitialized = MPV_ERROR_UNINITIALIZED
+    invalid_parameter = MPV_ERROR_INVALID_PARAMETER
+    not_found = MPV_ERROR_OPTION_NOT_FOUND
+    option_format = MPV_ERROR_OPTION_FORMAT
+    option_error = MPV_ERROR_OPTION_ERROR
+    not_found = MPV_ERROR_PROPERTY_NOT_FOUND
+    property_format = MPV_ERROR_PROPERTY_FORMAT
+    property_unavailable = MPV_ERROR_PROPERTY_UNAVAILABLE
+    property_error = MPV_ERROR_PROPERTY_ERROR
+
+
 class Events:
     none = MPV_EVENT_NONE
     shutdown = MPV_EVENT_SHUTDOWN
