@@ -236,8 +236,8 @@ cdef class Context(object):
         cdef const char** cmds = <const char**>malloc(lsize)
         if not cmds:
             raise MemoryError
+        cmdlist = [cmd.encode('utf-8') for cmd in cmdlist]
         for i, cmd in enumerate(cmdlist):
-            cmd = cmd.encode('utf-8')
             cmds[i] = <char*>cmd
         cmds[i + 1] = NULL
         rv = mpv_command(self._ctx, cmds)
