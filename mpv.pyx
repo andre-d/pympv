@@ -31,6 +31,7 @@ class Events:
     seek = MPV_EVENT_SEEK
     playback_restart = MPV_EVENT_PLAYBACK_RESTART
     property_change = MPV_EVENT_PROPERTY_CHANGE
+    chapter_change = MPV_EVENT_CHAPTER_CHANGE
 
 class EOFReasons:
     eof = 0
@@ -204,6 +205,12 @@ cdef class Context(object):
 
     def resume(self):
         mpv_resume(self._ctx)
+
+    @errors
+    def load_config(self, filename):
+        filename = filename.encode('utf-8')
+        cdef const char* _filename = filename
+        return mpv_load_config_file(self._ctx, _filename)
 
     def _format_for(self, value):
         if isinstance(value, str):
