@@ -232,7 +232,7 @@ cdef class Context(object):
 
     @errors
     def command(self, *cmdlist):
-        lsize = (len(cmdlist) + 1) * cython.sizeof(cython.p_int)
+        lsize = (len(cmdlist) + 1) * cython.sizeof(cython.pp_char)
         cdef const char** cmds = <const char**>malloc(lsize)
         if not cmds:
             raise MemoryError
