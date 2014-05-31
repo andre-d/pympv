@@ -264,7 +264,7 @@ cdef class Context(object):
         elif result.format == MPV_FORMAT_DOUBLE:
             v = float(result.u.double_)
         mpv_free_node_contents(&result)
-        return None
+        return v
 
     FLAG_SET = object()
     @errors
