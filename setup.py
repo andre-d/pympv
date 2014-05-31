@@ -15,7 +15,6 @@ def tryremove(filename):
 
 class Clean(clean):
     side_effects = [
-        "client.pxd",
         "mpv.c",
     ]
 
