@@ -1,4 +1,5 @@
 cimport cython
+import sys
 from libc.stdlib cimport malloc, free
 from client cimport *
 
@@ -6,6 +7,14 @@ _MPV_C_CLIENT_API_VERSION = 0
 
 if mpv_client_api_version() >> 16 != _MPV_C_CLIENT_API_VERSION:
     raise ImportError('libmpv version is incorrect') 
+
+_is_py3 = sys.version_info >= (3,)
+_strdec_err = 'surrogateescape' if _is_py3 else 'strict'
+def _strdec(s):
+    try:
+        return s.decode('utf-8', _strdec_err)
+    except UnicodeDecodeError:
+        return bytes(s)
 
 class Events:
     none = MPV_EVENT_NONE
@@ -62,7 +71,7 @@ cdef class InputDispatch(object):
 
     @property
     def type(self):
-        return self._input.type.decode('utf-8')
+        return _strdec(self._input.type)
 
     def __cinit__(self):
         self._input = NULL
@@ -76,15 +85,15 @@ cdef class LogMessage(object):
 
     @property
     def prefix(self):
-        return self._msg.prefix.decode('utf-8')
+        return _strdec(self._msg.prefix)
 
     @property
     def level(self):
-        return self._msg.level.decode('utf-8')
+        return _strdec(self._msg.level)
 
     @property
     def text(self):
-        return self._msg.text.decode('utf-8')
+        return _strdec(self._msg.text)
 
     def __cinit__(self):
         self._msg = NULL
@@ -95,7 +104,7 @@ cdef class LogMessage(object):
 
 cdef _convert_value(void* data, mpv_format format):
     if format == MPV_FORMAT_STRING:
-        return ((<char**>data)[0]).decode('utf-8')
+        return _strdec(((<char**>data)[0]))
     elif format == MPV_FORMAT_FLAG:
         return not not (<uint64_t*>data)[0]
     elif format == MPV_FORMAT_INT64:
@@ -109,7 +118,7 @@ cdef class Property(object):
 
     @property
     def name(self):
-        return self._property.name.decode('utf-8')
+        return _strdec(self._property.name)
 
     def data(self):
         return _convert_value(self._property.data, self._property.format)
@@ -133,7 +142,7 @@ cdef class Event(object):
 
     @property
     def error_str(self):
-        return mpv_error_string(self.error).decode('utf-8')
+        return _strdec(mpv_error_string(self.error))
 
     @property
     def id(self):
@@ -161,7 +170,7 @@ cdef class Event(object):
             num_args = climsg.num_args
             for i in range(0, num_args):
                 arg = <char*>climsg.args[i]
-                arg = arg.decode('utf-8')
+                arg = _strdec(arg)
                 args.append(arg)
             return args
         elif self.id == MPV_EVENT_END_FILE:
@@ -170,7 +179,7 @@ cdef class Event(object):
 
     @property
     def name(self):
-        return mpv_event_name(self._event.event_id).decode('utf-8')
+        return _strdec(mpv_event_name(self._event.event_id))
 
     cdef _init(self, mpv_event* event):
         self._event = event
@@ -186,7 +195,7 @@ def errors(infn):
 class MPVError(Exception):
     def __init__(self, e):
         if not isinstance(e, str):
-            e = mpv_error_string(e).decode('utf-8')
+            e = _strdec(mpv_error_string(e))
         Exception.__init__(self, e)
 
 cdef class Context(object):
@@ -194,7 +203,7 @@ cdef class Context(object):
 
     @property
     def name(self):
-        return mpv_client_name(self._ctx).decode('utf-8')
+        return _strdec(mpv_client_name(self._ctx))
 
     @property
     def time(self):
@@ -256,7 +265,7 @@ cdef class Context(object):
         if v < 0:
             raise MPVError(v)
         if result.format == MPV_FORMAT_STRING:
-            v = result.u.string.decode('utf-8')
+            v = _strdec(result.u.string)
         elif result.format == MPV_FORMAT_FLAG:
             v = not not int(result.u.flag)
         elif result.format == MPV_FORMAT_INT64:
