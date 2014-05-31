@@ -254,7 +254,6 @@ cdef class Context(object):
 
     cdef mpv_node _prep_native_value(self, value, format):
         cdef mpv_node node
-        cdef char* sv
         node.format = format
         if format == MPV_FORMAT_STRING:
             value = value.encode('utf-8')
