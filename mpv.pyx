@@ -167,7 +167,7 @@ cdef class Event(object):
             climsg = <mpv_event_client_message*>data
             args = []
             num_args = climsg.num_args
-            for i in range(0, num_args):
+            for i in range(num_args):
                 arg = <char*>climsg.args[i]
                 arg = _strdec(arg)
                 args.append(arg)
