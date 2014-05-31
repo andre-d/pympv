@@ -253,21 +253,21 @@ cdef class Context(object):
         return MPV_FORMAT_NONE
 
     cdef void* _prep_native_value(self, value, format):
+        cdef void* v = NULL
         if format == MPV_FORMAT_STRING:
             value = value.encode('utf-8')
-        if format == MPV_FORMAT_FLAG:
-            value = 1 if value else 0
-        cdef void* v
-        cdef char* cv
-        cdef uint64_t iv
-        if format == MPV_FORMAT_STRING:
-            cv = <char*>value
-            v = &cv
-        elif format == MPV_FORMAT_NONE:
-            v = NULL
-        else:
-            iv = value
-            v = &iv
+            v = malloc(len(value))
+            for i, c in enumerate(value):
+                (<char*>v)[i] = c
+        elif format == MPV_FORMAT_FLAG:
+            v = malloc(cython.sizeof(int))
+            (<int*>v)[0] = 1 if value else 0
+        elif format == MPV_FORMAT_INT64:
+            v = malloc(cython.sizeof(int64_t))
+            (<int64_t*>v)[0] = value
+        elif format == MPV_FORMAT_DOUBLE:
+            v = malloc(cython.sizeof(double))
+            (<double*>v)[0] = value
         return v
 
     @_errors
