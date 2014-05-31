@@ -174,7 +174,7 @@ cdef class Event(object):
         return self
 
 
-def errors(fn):
+def _errors(fn):
     def wrapped(*k, **kw):
         v = fn(*k, **kw)
         if v < 0:
@@ -205,12 +205,12 @@ cdef class Context(object):
     def resume(self):
         mpv_resume(self._ctx)
 
-    @errors
+    @_errors
     def set_log_level(self, loglevel):
         loglevel = loglevel.encode('utf-8')
         return mpv_request_log_messages(self._ctx, <const char*>loglevel)
 
-    @errors
+    @_errors
     def load_config(self, filename):
         filename = filename.encode('utf-8')
         cdef const char* _filename = filename
@@ -245,7 +245,7 @@ cdef class Context(object):
             v = &iv
         return v
 
-    @errors
+    @_errors
     def command(self, *cmdlist, async=False, int data=0):
         lsize = (len(cmdlist) + 1) * cython.sizeof(cython.pp_char)
         cdef const char** cmds = <const char**>malloc(lsize)
@@ -262,7 +262,7 @@ cdef class Context(object):
         free(cmds)
         return rv
 
-    @errors
+    @_errors
     def get_property_async(self, prop, int data=0):
         prop = prop.encode('utf-8')
         return mpv_get_property_async(
@@ -287,7 +287,7 @@ cdef class Context(object):
         mpv_free_node_contents(&result)
         return v
 
-    @errors
+    @_errors
     def set_property(self, prop, value=True, async=False, int data=0):
         prop = prop.encode('utf-8')
         cdef mpv_format format = self._format_for(value)
@@ -307,7 +307,7 @@ cdef class Context(object):
             v
         )
 
-    @errors
+    @_errors
     def set_option(self, prop, value=True):
         prop = prop.encode('utf-8')
         cdef mpv_format format = self._format_for(value)
@@ -319,7 +319,7 @@ cdef class Context(object):
             v
         )
 
-    @errors
+    @_errors
     def initialize(self):
         return mpv_initialize(self._ctx)
 
