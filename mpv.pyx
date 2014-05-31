@@ -111,7 +111,7 @@ cdef _convert_value(void* data, mpv_format format):
     if format == MPV_FORMAT_NODE:
         node = (<mpv_node*>data)[0]
         return _convert_node_value(node)
-    if format == MPV_FORMAT_STRING:
+    elif format == MPV_FORMAT_STRING:
         return _strdec(((<char**>data)[0]))
     elif format == MPV_FORMAT_FLAG:
         return not not (<uint64_t*>data)[0]
