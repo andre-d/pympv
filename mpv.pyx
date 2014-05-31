@@ -2,10 +2,10 @@ cimport cython
 from libc.stdlib cimport malloc, free
 from client cimport *
 
-_CAPI_CLIENT_MAX_VERSION = 0
+_MPV_C_CLIENT_API_VERSION = 0
 
-if mpv_client_api_version() >> 16 > _CAPI_CLIENT_MAX_VERSION:
-    raise ImportError('libmpv version is too new') 
+if mpv_client_api_version() >> 16 != _MPV_C_CLIENT_API_VERSION:
+    raise ImportError('libmpv version is incorrect') 
 
 class Events:
     none = MPV_EVENT_NONE
