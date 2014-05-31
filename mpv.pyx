@@ -127,7 +127,7 @@ cdef _convert_value(void* data, mpv_format format):
         values = {}
         for i in range(nodelist.num):
             value = _convert_node_value(nodelist.values[i])
-            values[nodelist.keys[i]] = value
+            values[_strdec(nodelist.keys[i])] = value
         return values
     elif format == MPV_FORMAT_STRING:
         return _strdec(((<char**>data)[0]))
