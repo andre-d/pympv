@@ -89,8 +89,8 @@ cdef class LogMessage(object):
 
     cdef _init(self, mpv_event_log_message* msg):
         self.level = _strdec(msg.level)
-        self.prefix = _strdec(msg.level)
-        self.text = _strdec(msg.level)
+        self.prefix = _strdec(msg.prefix)
+        self.text = _strdec(msg.text)
         return self
 
 
@@ -204,6 +204,11 @@ cdef class Context(object):
 
     def resume(self):
         mpv_resume(self._ctx)
+
+    @errors
+    def set_log_level(self, loglevel):
+        loglevel = loglevel.encode('utf-8')
+        return mpv_request_log_messages(self._ctx, <const char*>loglevel)
 
     @errors
     def load_config(self, filename):
