@@ -3,6 +3,7 @@ import sys
 from libc.stdlib cimport malloc, free
 from client cimport *
 
+
 _MPV_C_CLIENT_API_VERSION = 0
 
 if mpv_client_api_version() >> 16 != _MPV_C_CLIENT_API_VERSION:
@@ -58,11 +59,13 @@ class Events:
     property_change = MPV_EVENT_PROPERTY_CHANGE
     chapter_change = MPV_EVENT_CHAPTER_CHANGE
 
+
 class EOFReasons:
     eof = 0
     restarted = 1
     aborted = 2
     quit = 3
+
 
 cdef class EndOfFileReached(object):
     cdef public object reason
@@ -70,6 +73,7 @@ cdef class EndOfFileReached(object):
     cdef _init(self, mpv_event_end_file* eof):
         self.reason = eof.reason
         return self
+
 
 cdef class InputDispatch(object):
     cdef public object arg0, type
@@ -79,6 +83,7 @@ cdef class InputDispatch(object):
         self.type = _strdec(input.type)
         return self
 
+
 cdef class LogMessage(object):
     cdef public object prefix, level, text
 
@@ -87,6 +92,7 @@ cdef class LogMessage(object):
         self.prefix = _strdec(msg.level)
         self.text = _strdec(msg.level)
         return self
+
 
 cdef _convert_node_value(mpv_node node):
     if node.format == MPV_FORMAT_STRING:
@@ -98,6 +104,7 @@ cdef _convert_node_value(mpv_node node):
     elif node.format == MPV_FORMAT_DOUBLE:
         return float(node.u.double_)
     return None
+
 
 cdef _convert_value(void* data, mpv_format format):
     cdef mpv_node node
@@ -114,6 +121,7 @@ cdef _convert_value(void* data, mpv_format format):
         return float((<double*>data)[0])
     return None
 
+
 cdef class Property(object):
     cdef public object name, data
 
@@ -121,6 +129,7 @@ cdef class Property(object):
         self.name = _strdec(prop.name)
         self.data = _convert_value(prop.data, prop.format)
         return self
+
 
 cdef class Event(object):
     cdef public object id, data, reply_userdata, error
@@ -164,12 +173,14 @@ cdef class Event(object):
         self.error = event.error
         return self
 
+
 def errors(fn):
     def wrapped(*k, **kw):
         v = fn(*k, **kw)
         if v < 0:
             raise MPVError(v)
     return wrapped
+
 
 class MPVError(Exception):
     def __init__(self, e):
