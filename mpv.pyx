@@ -251,7 +251,7 @@ cdef class Context(object):
         return mpv_initialize(self._ctx)
 
     def wait_event(self, timeout=None):
-        timeout = timeout or 0
+        timeout = timeout or -1
         return Event()._init(mpv_wait_event(self._ctx, timeout))
 
     def __cinit__(self):
