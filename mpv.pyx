@@ -184,10 +184,11 @@ cdef class Event(object):
     def name(self):
         return _strdec(mpv_event_name(self.id))
 
-    cdef _init(self, mpv_event* event):
+    cdef _init(self, mpv_event* event, ctx):
         self.id = event.event_id
         self.data = self._data(event)
-        self.reply_userdata = event.reply_userdata
+        userdata = _async_data[ctx.name].pop(event.reply_userdata, None)
+        self.reply_userdata = userdata.data if userdata else None
         self.error = event.error
         return self
 
@@ -206,7 +207,16 @@ class MPVError(Exception):
             e = _strdec(mpv_error_string(e))
         Exception.__init__(self, e)
 
+
 _callbacks = {}
+
+
+_async_data = {}
+class _AsyncData:
+    def __init__(self, ctx, data):
+        self.data = data
+        _async_data[ctx.name][id(self)] = self
+
 
 cdef class Context(object):
     cdef mpv_handle *_ctx
@@ -269,7 +279,7 @@ cdef class Context(object):
         return node
 
     @_errors
-    def command(self, *cmdlist, async=False, int data=0):
+    def command(self, *cmdlist, async=False, data=None):
         lsize = (len(cmdlist) + 1) * cython.sizeof(pp_char)
         cdef const char** cmds = <const char**>malloc(lsize)
         if not cmds:
@@ -281,13 +291,15 @@ cdef class Context(object):
         if not async:
             rv = mpv_command(self._ctx, cmds)
         else:
-            rv = mpv_command_async(self._ctx, <uint64_t>data, cmds)
+            data = id(_AsyncData(self, data)) if data is not None else id(None)
+            rv = mpv_command_async(self._ctx, data, cmds)
         free(cmds)
         return rv
 
     @_errors
-    def get_property_async(self, prop, int data=0):
+    def get_property_async(self, prop, data=None):
         prop = prop.encode('utf-8')
+        data = id(_AsyncData(self, data)) if data is not None else id(None)
         return mpv_get_property_async(
             self._ctx,
             data,
@@ -311,38 +323,37 @@ cdef class Context(object):
         return v
 
     @_errors
-    def set_property(self, prop, value=True, async=False, int data=0):
+    def set_property(self, prop, value=True, async=False, data=None):
         prop = prop.encode('utf-8')
         cdef mpv_format format = self._format_for(value)
         cdef mpv_node v = self._prep_native_value(value, format)
         if not async:
-            err = mpv_set_property(
+            return mpv_set_property(
                 self._ctx,
                 <const char*>prop,
                 MPV_FORMAT_NODE,
                 &v
             )
-        err = mpv_set_property_async(
+        data = id(_AsyncData(self, data)) if data is not None else id(None)
+        return mpv_set_property_async(
             self._ctx,
             data,
             <const char*>prop,
             MPV_FORMAT_NODE,
             &v
         )
-        return err
 
     @_errors
     def set_option(self, prop, value=True):
         prop = prop.encode('utf-8')
         cdef mpv_format format = self._format_for(value)
         cdef mpv_node v = self._prep_native_value(value, format)
-        err = mpv_set_option(
+        return mpv_set_option(
             self._ctx,
             <const char*>prop,
             MPV_FORMAT_NODE,
             &v
         )
-        return err
 
     @_errors
     def initialize(self):
@@ -350,7 +361,7 @@ cdef class Context(object):
 
     def wait_event(self, timeout=None):
         timeout = timeout if timeout is not None else -1
-        return Event()._init(mpv_wait_event(self._ctx, timeout))
+        return Event()._init(mpv_wait_event(self._ctx, timeout), self)
 
     def wakeup(self):
         mpv_wakeup(self._ctx)
@@ -365,9 +376,11 @@ cdef class Context(object):
         if not self._ctx:
             raise MPVError('Context creation error')
         _callbacks[self.name] = (None, None)
+        _async_data[self.name] = {}
 
     def __dealloc__(self):
         del _callbacks[self.name]
+        del _async_data[self.name]
         mpv_destroy(self._ctx)
 
 cdef void c_callback(void* d):
