@@ -150,7 +150,7 @@ cdef class Property(object):
 
 
 cdef class Event(object):
-    cdef public object id, data, reply_userdata, error
+    cdef public object id, data, reply_userdata, observed_property, error
 
     @property
     def error_str(self):
@@ -187,8 +187,12 @@ cdef class Event(object):
     cdef _init(self, mpv_event* event, ctx):
         self.id = event.event_id
         self.data = self._data(event)
-        userdata = _async_data[ctx.name].pop(event.reply_userdata, None)
-        self.reply_userdata = userdata.data if userdata else None
+        if self.id == MPV_EVENT_PROPERTY_CHANGE:
+            userdata = _async_data[ctx.name].get(event.reply_userdata, None)
+            self.observed_property = userdata
+        else:
+            userdata = _async_data[ctx.name].pop(event.reply_userdata, None)
+        self.reply_userdata = userdata.value() if userdata else None
         self.error = event.error
         return self
 
@@ -214,8 +218,19 @@ _callbacks = {}
 _async_data = {}
 class _AsyncData:
     def __init__(self, ctx, data):
+        self.group = ctx.name
         self.data = data
-        _async_data[ctx.name][id(self)] = self
+        _async_data[self.group][id(self)] = self
+
+    def _remove(self):
+        del _async_data[self.group][id(self)]
+
+    def value(self):
+        return self.data
+
+
+class ObservedProperty(_AsyncData):
+    pass
 
 
 cdef class Context(object):
@@ -291,21 +306,24 @@ cdef class Context(object):
         if not async:
             rv = mpv_command(self._ctx, cmds)
         else:
-            data = id(_AsyncData(self, data)) if data is not None else id(None)
-            rv = mpv_command_async(self._ctx, data, cmds)
+            data = _AsyncData(self, data) if data is not None else None
+            rv = mpv_command_async(self._ctx, id(data), cmds)
         free(cmds)
         return rv
 
     @_errors
     def get_property_async(self, prop, data=None):
         prop = prop.encode('utf-8')
-        data = id(_AsyncData(self, data)) if data is not None else id(None)
-        return mpv_get_property_async(
+        data = _AsyncData(self, data) if data is not None else None
+        v = mpv_get_property_async(
             self._ctx,
-            data,
+            id(data),
             <const char*>prop,
             MPV_FORMAT_NODE,
         )
+        if v < 0 and data:
+            data._remove()
+        return v
 
     def get_property(self, prop):
         cdef mpv_node result
@@ -334,14 +352,17 @@ cdef class Context(object):
                 MPV_FORMAT_NODE,
                 &v
             )
-        data = id(_AsyncData(self, data)) if data is not None else id(None)
-        return mpv_set_property_async(
+        data = _AsyncData(self, data) if data is not None else None
+        err = mpv_set_property_async(
             self._ctx,
-            data,
+            id(data),
             <const char*>prop,
             MPV_FORMAT_NODE,
             &v
         )
+        if err < 0 and data:
+            data._remove()
+        return err
 
     @_errors
     def set_option(self, prop, value=True):
@@ -378,10 +399,32 @@ cdef class Context(object):
         _callbacks[self.name] = (None, None)
         _async_data[self.name] = {}
 
+    def observe_property(self, prop, data=None):
+        data = ObservedProperty(self, data)
+        prop = prop.encode('utf-8')
+        v = mpv_observe_property(
+            self._ctx,
+            id(data),
+            prop,
+            MPV_FORMAT_NODE,
+        )
+        if v < 0:
+            data._remove()
+            raise MPVError(v)
+        return data
+
+    def unobserve_property(self, data):
+        data._remove()
+        return mpv_unobserve_property(
+            self._ctx,
+            id(data),
+        )
+
     def __dealloc__(self):
         del _callbacks[self.name]
         del _async_data[self.name]
         mpv_destroy(self._ctx)
+
 
 cdef void c_callback(void* d):
     name = <char*>d
