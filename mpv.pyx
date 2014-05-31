@@ -103,6 +103,10 @@ cdef _convert_node_value(mpv_node node):
         return int(node.u.int64)
     elif node.format == MPV_FORMAT_DOUBLE:
         return float(node.u.double_)
+    elif node.format == MPV_FORMAT_NODE_MAP:
+        return _convert_value(node.u.list, node.format)
+    elif node.format == MPV_FORMAT_NODE_ARRAY:
+        return _convert_value(node.u.list, node.format)
     return None
 
 
