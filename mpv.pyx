@@ -224,7 +224,7 @@ class _AsyncData:
         _async_data[self._group][id(self)] = self
 
     def _remove(self):
-        del _async_data[self._group][id(self)]
+        _async_data[self._group].pop(id(self))
 
     def value(self):
         return self._data
@@ -417,6 +417,7 @@ cdef class Context(object):
             raise MPVError(v)
         return data
 
+    @_errors
     def unobserve_property(self, data):
         data._remove() if data else None
         return mpv_unobserve_property(
