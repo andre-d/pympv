@@ -76,6 +76,7 @@ cdef extern from "mpv/client.h":
         MPV_ERROR_PROPERTY_FORMAT
         MPV_ERROR_PROPERTY_UNAVAILABLE
         MPV_ERROR_PROPERTY_ERROR
+        MPV_ERROR_COMMAND
 
     const char *mpv_error_string(int error)
 
