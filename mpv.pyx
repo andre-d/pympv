@@ -31,6 +31,7 @@ class Errors:
     property_format = MPV_ERROR_PROPERTY_FORMAT
     property_unavailable = MPV_ERROR_PROPERTY_UNAVAILABLE
     property_error = MPV_ERROR_PROPERTY_ERROR
+    command_error = MPV_ERROR_COMMAND
 
 
 class Events:
