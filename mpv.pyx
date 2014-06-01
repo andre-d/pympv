@@ -218,15 +218,15 @@ _callbacks = {}
 _async_data = {}
 class _AsyncData:
     def __init__(self, ctx, data):
-        self.group = ctx.name
-        self.data = data
-        _async_data[self.group][id(self)] = self
+        self._group = ctx.name
+        self._data = data
+        _async_data[self._group][id(self)] = self
 
     def _remove(self):
-        del _async_data[self.group][id(self)]
+        del _async_data[self._group][id(self)]
 
     def value(self):
-        return self.data
+        return self._data
 
 
 class ObservedProperty(_AsyncData):
