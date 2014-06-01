@@ -400,7 +400,10 @@ cdef class Context(object):
         _async_data[self.name] = {}
 
     def observe_property(self, prop, data=None):
-        data = ObservedProperty(self, data)
+        new = False
+        if data is not None and not isinstance(data, ObservedProperty):
+            new = True
+            data = ObservedProperty(self, data)
         prop = prop.encode('utf-8')
         v = mpv_observe_property(
             self._ctx,
@@ -409,12 +412,12 @@ cdef class Context(object):
             MPV_FORMAT_NODE,
         )
         if v < 0:
-            data._remove()
+            data._remove() if new else None
             raise MPVError(v)
         return data
 
     def unobserve_property(self, data):
-        data._remove()
+        data._remove() if data else None
         return mpv_unobserve_property(
             self._ctx,
             id(data),
