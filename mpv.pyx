@@ -1,4 +1,3 @@
-cimport cython
 import sys
 from libc.stdlib cimport malloc, free
 from client cimport *
@@ -296,7 +295,7 @@ cdef class Context(object):
 
     @_errors
     def command(self, *cmdlist, async=False, data=None):
-        lsize = (len(cmdlist) + 1) * cython.sizeof(pp_char)
+        lsize = (len(cmdlist) + 1) * sizeof(void*)
         cdef const char** cmds = <const char**>malloc(lsize)
         if not cmds:
             raise MemoryError
