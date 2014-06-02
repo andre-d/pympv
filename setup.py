@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import os
 from subprocess import call
 from distutils.core import setup
