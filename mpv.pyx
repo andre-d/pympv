@@ -253,6 +253,7 @@ class MPVError(Exception):
     code = None
     
     def __init__(self, e):
+        self.code = e
         if not isinstance(e, str):
             e = _strdec(mpv_error_string(e))
         Exception.__init__(self, e)
