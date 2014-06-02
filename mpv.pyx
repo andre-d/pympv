@@ -1,7 +1,16 @@
+"""pympv - Python wrapper for libmpv
+
+libmpv is a client library for the media player mpv
+
+For more info see: https://github.com/mpv-player/mpv/blob/master/libmpv/client.h
+"""
+
 import sys
 from libc.stdlib cimport malloc, free
 from client cimport *
 
+__version__ = 0.1
+__author__ = "Andre D"
 
 _MPV_C_CLIENT_API_VERSION = 0
 
@@ -18,6 +27,12 @@ def _strdec(s):
 
 
 class Errors:
+    """Set of known error codes from MpvError and Event responses.
+
+    Mostly wraps the enum mpv_error.
+    Values might not always be integers in the future.
+    You should handle the possibility that error codes may not be any of these values.
+    """
     success = MPV_ERROR_SUCCESS
     queue_full = MPV_ERROR_EVENT_QUEUE_FULL
     nomem = MPV_ERROR_NOMEM
@@ -34,6 +49,12 @@ class Errors:
 
 
 class Events:
+    """Set of known values for Event ids.
+
+    Mostly wraps the enum mpv_event_id.
+    Values might not always be integers in the future.
+    You should handle the possibility that event ids may not be any of these values.
+    """
     none = MPV_EVENT_NONE
     shutdown = MPV_EVENT_SHUTDOWN
     log_message = MPV_EVENT_LOG_MESSAGE
@@ -61,6 +82,10 @@ class Events:
 
 
 class EOFReasons:
+    """Known possible values for EndOfFileReached reason.
+
+    You should handle the possibility that the reason may not be any of these values.
+    """
     eof = 0
     restarted = 1
     aborted = 2
@@ -68,6 +93,10 @@ class EOFReasons:
 
 
 cdef class EndOfFileReached(object):
+    """Data field for MPV_EVENT_END_FILE events
+
+    Wraps: mpv_event_end_file
+    """
     cdef public object reason
 
     cdef _init(self, mpv_event_end_file* eof):
@@ -76,6 +105,10 @@ cdef class EndOfFileReached(object):
 
 
 cdef class InputDispatch(object):
+    """Data field for MPV_EVENT_SCRIPT_INPUT_DISPATCH events.
+
+    Wraps: mpv_event_script_input_dispatch
+    """
     cdef public object arg0, type
 
     cdef _init(self, mpv_event_script_input_dispatch* input):
@@ -85,6 +118,10 @@ cdef class InputDispatch(object):
 
 
 cdef class LogMessage(object):
+    """Data field for MPV_EVENT_LOG_MESSAGE events.
+    
+    Wraps: mpv_event_log_message
+    """
     cdef public object prefix, level, text
 
     cdef _init(self, mpv_event_log_message* msg):
@@ -141,6 +178,10 @@ cdef _convert_value(void* data, mpv_format format):
 
 
 cdef class Property(object):
+    """Data field for MPV_EVENT_PROPERTY_CHANGE and MPV_EVENT_GET_PROPERTY_REPLY.
+
+    Wraps: mpv_event_property
+    """
     cdef public object name, data
 
     cdef _init(self, mpv_event_property* prop):
@@ -150,10 +191,12 @@ cdef class Property(object):
 
 
 cdef class Event(object):
+    """Wraps: mpv_event"""
     cdef public object id, data, reply_userdata, observed_property, error
 
     @property
     def error_str(self):
+        """mpv_error_string of the error proeprty"""
         return _strdec(mpv_error_string(self.error))
 
     cdef _data(self, mpv_event* event):
@@ -182,6 +225,7 @@ cdef class Event(object):
 
     @property
     def name(self):
+        """mpv_event_name of the event id"""
         return _strdec(mpv_event_name(self.id))
 
     cdef _init(self, mpv_event* event, ctx):
@@ -206,6 +250,8 @@ def _errors(fn):
 
 
 class MPVError(Exception):
+    code = None
+    
     def __init__(self, e):
         if not isinstance(e, str):
             e = _strdec(mpv_error_string(e))
@@ -230,38 +276,67 @@ class _AsyncData:
 
 
 class ObservedProperty(_AsyncData):
-    pass
+    pass 
 
 
 cdef class Context(object):
+    """Base class wrapping a context to interact with mpv.
+
+    Assume all calls can raise MPVError.
+
+    Wraps: mpv_create, mpv_destroy and all mpv_handle related calls
+    """
+
     cdef mpv_handle *_ctx
 
     @property
     def name(self):
+        """Unique name for every context created.
+
+        Wraps: mpv_client_name
+        """
         return _strdec(mpv_client_name(self._ctx))
 
     @property
     def time(self):
+        """Internal mpv client time.
+
+        Has an arbitrary start offset, but will never wrap or go backwards.
+
+        Wraps: mpv_get_time_us
+        """
         return mpv_get_time_us(self._ctx)
 
     def suspend(self):
+        """Wraps: mpv_suspend"""
         mpv_suspend(self._ctx)
 
     def resume(self):
+        """Wraps: mpv_resume"""
         mpv_resume(self._ctx)
 
     @_errors
     def request_event(self, event, enable):
+        """Enable or disable a given event.
+
+        Arguments:
+        event - See Events
+        enable - True to enable, False to disable
+
+        Wraps: mpv_request_event
+        """
         enable = 1 if enable else 0
         return mpv_request_event(self._ctx, event, enable)
 
     @_errors
     def set_log_level(self, loglevel):
+        """Wraps: mpv_request_log_messages"""
         loglevel = loglevel.encode('utf-8')
         return mpv_request_log_messages(self._ctx, <const char*>loglevel)
 
     @_errors
     def load_config(self, filename):
+        """Wraps: mpv_load_config_file"""
         filename = filename.encode('utf-8')
         cdef const char* _filename = filename
         return mpv_load_config_file(self._ctx, _filename)
@@ -295,6 +370,17 @@ cdef class Context(object):
 
     @_errors
     def command(self, *cmdlist, async=False, data=None):
+        """Send a command to mpv.
+
+        Arguments:
+        Accepts parameters as args, not a single string.
+
+        Keyword Arguments:
+        async: True will return right away, status comes in as MPV_EVENT_COMMAND_REPLY
+        data: Only valid if async, gets sent back as reply_userdata in the Event
+
+        Wraps: mpv_command and mpv_command_async
+        """
         lsize = (len(cmdlist) + 1) * sizeof(void*)
         cdef const char** cmds = <const char**>malloc(lsize)
         if not cmds:
@@ -313,6 +399,14 @@ cdef class Context(object):
 
     @_errors
     def get_property_async(self, prop, data=None):
+        """Gets the value of a property asynchronously.
+
+        Arguments:
+        prop: Property to get the value of.
+        
+        Keyword arguments:
+        data: Value to be passed into the reply_userdata of the response event.
+        Wraps: mpv_get_property_async"""
         prop = prop.encode('utf-8')
         data = _AsyncData(self, data) if data is not None else None
         v = mpv_get_property_async(
@@ -326,6 +420,7 @@ cdef class Context(object):
         return v
 
     def get_property(self, prop):
+        """Wraps: mpv_get_property"""
         cdef mpv_node result
         prop = prop.encode('utf-8')
         v = mpv_get_property(
@@ -342,6 +437,7 @@ cdef class Context(object):
 
     @_errors
     def set_property(self, prop, value=True, async=False, data=None):
+        """Wraps: mpv_set_property and mpv_set_property_async"""
         prop = prop.encode('utf-8')
         cdef mpv_format format = self._format_for(value)
         cdef mpv_node v = self._prep_native_value(value, format)
@@ -366,6 +462,7 @@ cdef class Context(object):
 
     @_errors
     def set_option(self, prop, value=True):
+        """Wraps: mpv_set_option"""
         prop = prop.encode('utf-8')
         cdef mpv_format format = self._format_for(value)
         cdef mpv_node v = self._prep_native_value(value, format)
@@ -378,16 +475,20 @@ cdef class Context(object):
 
     @_errors
     def initialize(self):
+        """Wraps: mpv_initialize"""
         return mpv_initialize(self._ctx)
 
     def wait_event(self, timeout=None):
+        """Wraps: mpv_wait_event"""
         timeout = timeout if timeout is not None else -1
         return Event()._init(mpv_wait_event(self._ctx, timeout), self)
 
     def wakeup(self):
+        """Wraps: mpv_wakeup"""
         mpv_wakeup(self._ctx)
 
     def set_wakeup_callback(self, callback, data):
+        """Wraps: mpv_set_wakeup_callback"""
         cdef char* name = self.name
         _callbacks[self.name] = (callback, data)
         mpv_set_wakeup_callback(self._ctx, c_callback, <void*>name)
@@ -400,6 +501,7 @@ cdef class Context(object):
         _async_data[self.name] = {}
 
     def observe_property(self, prop, data=None):
+        """Wraps: mpv_observe_property"""
         new = False
         if data is not None and not isinstance(data, ObservedProperty):
             new = True
@@ -418,6 +520,7 @@ cdef class Context(object):
 
     @_errors
     def unobserve_property(self, data):
+        """Wraps: mpv_unobserve_property"""
         data._remove() if data else None
         return mpv_unobserve_property(
             self._ctx,
