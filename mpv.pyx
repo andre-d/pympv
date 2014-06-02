@@ -491,7 +491,7 @@ cdef class Context(object):
         """Wraps: mpv_set_wakeup_callback"""
         cdef char* name = self.name
         _callbacks[self.name] = (callback, data)
-        mpv_set_wakeup_callback(self._ctx, c_callback, <void*>name)
+        mpv_set_wakeup_callback(self._ctx, _c_callback, <void*>name)
 
     def __cinit__(self):
         self._ctx = mpv_create()
@@ -533,7 +533,7 @@ cdef class Context(object):
         mpv_destroy(self._ctx)
 
 
-cdef void c_callback(void* d):
+cdef void _c_callback(void* d):
     name = <char*>d
     cb, data = _callbacks[name]
     cb(data) if cb else None
