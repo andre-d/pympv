@@ -245,10 +245,10 @@ cdef class Event(object):
         self.id = event.event_id
         self.data = self._data(event)
         if self.id == MPV_EVENT_PROPERTY_CHANGE:
-            userdata = _async_data[ctx.name].get(event.reply_userdata, None)
+            userdata = _async_data[id(ctx)].get(event.reply_userdata, None)
             self.observed_property = userdata
         else:
-            userdata = _async_data[ctx.name].pop(event.reply_userdata, None)
+            userdata = _async_data[id(ctx)].pop(event.reply_userdata, None)
         self.reply_userdata = userdata.value() if userdata else None
         self.error = event.error
         return self
@@ -278,7 +278,7 @@ _callbacks = {}
 _async_data = {}
 class _AsyncData:
     def __init__(self, ctx, data):
-        self._group = ctx.name
+        self._group = id(ctx)
         self._data = data
         _async_data[self._group][id(self)] = self
 
@@ -503,16 +503,16 @@ cdef class Context(object):
 
     def set_wakeup_callback(self, callback, data):
         """Wraps: mpv_set_wakeup_callback"""
-        cdef char* name = self.name
-        _callbacks[self.name] = (callback, data)
+        cdef int64_t name = id(self)
+        _callbacks[id(self)] = (callback, data)
         mpv_set_wakeup_callback(self._ctx, _c_callback, <void*>name)
 
     def __cinit__(self):
         self._ctx = mpv_create()
         if not self._ctx:
             raise MPVError('Context creation error')
-        _callbacks[self.name] = (None, None)
-        _async_data[self.name] = {}
+        _callbacks[id(self)] = (None, None)
+        _async_data[id(self)] = {}
 
     def observe_property(self, prop, data=None):
         """Wraps: mpv_observe_property"""
@@ -542,12 +542,12 @@ cdef class Context(object):
         )
 
     def __dealloc__(self):
-        del _callbacks[self.name]
-        del _async_data[self.name]
+        del _callbacks[id(self)]
+        del _async_data[id(self)]
         mpv_destroy(self._ctx)
 
 
 cdef void _c_callback(void* d):
-    name = <char*>d
+    name = <int64_t>d
     cb, data = _callbacks[name]
     cb(data) if cb else None
