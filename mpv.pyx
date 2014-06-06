@@ -32,12 +32,19 @@ if mpv_client_api_version() >> 16 != _MPV_C_CLIENT_API_VERSION:
 
 _is_py3 = sys.version_info >= (3,)
 _strdec_err = 'surrogateescape' if _is_py3 else 'strict'
+# mpv -> Python
 def _strdec(s):
     try:
         return s.decode('utf-8', _strdec_err)
     except UnicodeDecodeError:
         return bytes(s)
 
+# Python -> mpv
+def _strenc(s):
+    try:
+        return bytes(s, 'utf-8', _strdec_err)
+    except:
+        return s.encode('utf-8')
 
 class Errors:
     """Set of known error codes from MpvError and Event responses.
@@ -345,13 +352,13 @@ cdef class Context(object):
     @_errors
     def set_log_level(self, loglevel):
         """Wraps: mpv_request_log_messages"""
-        loglevel = loglevel.encode('utf-8')
+        loglevel = _strenc(loglevel)
         return mpv_request_log_messages(self._ctx, <const char*>loglevel)
 
     @_errors
     def load_config(self, filename):
         """Wraps: mpv_load_config_file"""
-        filename = filename.encode('utf-8')
+        filename = _strenc(filename)
         cdef const char* _filename = filename
         return mpv_load_config_file(self._ctx, _filename)
 
@@ -370,7 +377,7 @@ cdef class Context(object):
         cdef mpv_node node
         node.format = format
         if format == MPV_FORMAT_STRING:
-            value = value.encode('utf-8')
+            value = _strenc(value)
             node.u.string = value
         elif format == MPV_FORMAT_FLAG:
             node.u.flag = 1 if value else 0
@@ -399,7 +406,7 @@ cdef class Context(object):
         cdef const char** cmds = <const char**>malloc(lsize)
         if not cmds:
             raise MemoryError
-        cmdlist = [cmd.encode('utf-8') for cmd in cmdlist]
+        cmdlist = [_strenc(cmd) for cmd in cmdlist]
         for i, cmd in enumerate(cmdlist):
             cmds[i] = <char*>cmd
         cmds[i + 1] = NULL
@@ -421,7 +428,7 @@ cdef class Context(object):
         Keyword arguments:
         data: Value to be passed into the reply_userdata of the response event.
         Wraps: mpv_get_property_async"""
-        prop = prop.encode('utf-8')
+        prop = _strenc(prop)
         data = _AsyncData(self, data) if data is not None else None
         v = mpv_get_property_async(
             self._ctx,
@@ -436,7 +443,7 @@ cdef class Context(object):
     def get_property(self, prop):
         """Wraps: mpv_get_property"""
         cdef mpv_node result
-        prop = prop.encode('utf-8')
+        prop = _strenc(prop)
         v = mpv_get_property(
             self._ctx,
             <const char*>prop,
@@ -452,7 +459,7 @@ cdef class Context(object):
     @_errors
     def set_property(self, prop, value=True, async=False, data=None):
         """Wraps: mpv_set_property and mpv_set_property_async"""
-        prop = prop.encode('utf-8')
+        prop = _strenc(prop)
         cdef mpv_format format = self._format_for(value)
         cdef mpv_node v = self._prep_native_value(value, format)
         if not async:
@@ -477,7 +484,7 @@ cdef class Context(object):
     @_errors
     def set_option(self, prop, value=True):
         """Wraps: mpv_set_option"""
-        prop = prop.encode('utf-8')
+        prop = _strenc(prop)
         cdef mpv_format format = self._format_for(value)
         cdef mpv_node v = self._prep_native_value(value, format)
         return mpv_set_option(
@@ -520,7 +527,7 @@ cdef class Context(object):
         if data is not None and not isinstance(data, ObservedProperty):
             new = True
             data = ObservedProperty(self, data)
-        prop = prop.encode('utf-8')
+        prop = _strenc(prop)
         v = mpv_observe_property(
             self._ctx,
             id(data),
