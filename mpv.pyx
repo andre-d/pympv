@@ -574,7 +574,7 @@ cdef class Context(object):
     def set_wakeup_callback(self, callback, data):
         """Wraps: mpv_set_wakeup_callback"""
         cdef int64_t name = id(self)
-        _callbacks[id(self)] = (callback, data)
+        _callbacks[id(self)] = callback
         with nogil:
             mpv_set_wakeup_callback(self._ctx, _c_callback, <void*>name)
 
@@ -590,7 +590,7 @@ cdef class Context(object):
             self._ctx = mpv_create()
         if not self._ctx:
             raise MPVError('Context creation error')
-        _callbacks[id(self)] = (None, None)
+        _callbacks[id(self)] = None
         _async_data[id(self)] = {}
 
     def observe_property(self, prop, data=None):
@@ -637,5 +637,5 @@ cdef class Context(object):
 
 cdef void _c_callback(void* d) with gil:
     name = <int64_t>d
-    cb, data = _callbacks[name]
-    cb(data) if cb else None
+    cb = _callbacks[name]
+    cb() if cb else None
