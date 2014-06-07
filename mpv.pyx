@@ -49,7 +49,7 @@ def _strdec(s):
 # Python -> mpv
 def _strenc(s):
     try:
-        return bytes(s, 'utf-8', _strdec_err)
+        return s.encode('utf-8', _strdec_err)
     except UnicodeEncodeError:
         # In python2, assume bytes and walk right through
         return s
