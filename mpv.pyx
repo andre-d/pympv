@@ -629,13 +629,16 @@ cdef class Context(object):
         return err
 
     def __dealloc__(self):
-        del _callbacks[id(self)]
-        del _async_data[id(self)]
         with nogil:
             mpv_destroy(self._ctx)
+        del _callbacks[id(self)]
+        del _async_data[id(self)]
 
 
 cdef void _c_callback(void* d) with gil:
     name = <int64_t>d
-    cb = _callbacks[name]
-    cb() if cb else None
+    cb = _callbacks.get(name)
+    try:
+        cb() if cb else None
+    except Exception as e:
+        sys.stderr.write("pympv error during callback: %s\n" % e)
