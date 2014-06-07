@@ -22,7 +22,7 @@ To use
         m.set_option('osc')
         m.initialize()
 
-        m.command("loadfile", args[0])
+        m.command('loadfile', args[0])
 
         while True:
             event = m.wait_event(.01)
