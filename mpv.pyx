@@ -586,10 +586,10 @@ cdef class Context(object):
 
     def get_wakeup_pipe(self):
         """Wraps: mpv_get_wakeup_pipe"""
-        cdef int err
+        cdef int pipe
         with nogil:
-            err = mpv_get_wakeup_pipe(self._ctx)
-        return err
+            pipe = mpv_get_wakeup_pipe(self._ctx)
+        return pipe
 
     def __cinit__(self):
         with nogil:
