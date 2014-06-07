@@ -507,6 +507,10 @@ cdef class Context(object):
         _callbacks[id(self)] = (callback, data)
         mpv_set_wakeup_callback(self._ctx, _c_callback, <void*>name)
 
+    def get_wakeup_pipe(self):
+        """Wraps: mpv_get_wakeup_pipe"""
+        return mpv_get_wakeup_pipe(self._ctx)
+
     def __cinit__(self):
         self._ctx = mpv_create()
         if not self._ctx:
