@@ -37,14 +37,16 @@ def _strdec(s):
     try:
         return s.decode('utf-8', _strdec_err)
     except UnicodeDecodeError:
+        # In python2, bail to bytes on failure
         return bytes(s)
 
 # Python -> mpv
 def _strenc(s):
     try:
         return bytes(s, 'utf-8', _strdec_err)
-    except:
-        return s.encode('utf-8')
+    except UnicodeEncodeError:
+        # In python2, assume bytes and walk right through
+        return s
 
 class Errors:
     """Set of known error codes from MpvError and Event responses.
