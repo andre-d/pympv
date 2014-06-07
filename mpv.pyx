@@ -514,21 +514,27 @@ cdef class Context(object):
         prop = _strenc(prop)
         cdef mpv_format format = self._format_for(value)
         cdef mpv_node v = self._prep_native_value(value, format)
+        cdef int err
+        cdef const char* prop_c = prop
         if not async:
-            return mpv_set_property(
+            with nogil:
+                err = mpv_set_property(
+                    self._ctx,
+                    prop_c,
+                    MPV_FORMAT_NODE,
+                    &v
+                )
+            return err
+        data = _AsyncData(self, data) if data is not None else None
+        cdef int data_id = id(data)
+        with nogil:
+            err = mpv_set_property_async(
                 self._ctx,
-                <const char*>prop,
+                data_id,
+                prop_c,
                 MPV_FORMAT_NODE,
                 &v
             )
-        data = _AsyncData(self, data) if data is not None else None
-        err = mpv_set_property_async(
-            self._ctx,
-            id(data),
-            <const char*>prop,
-            MPV_FORMAT_NODE,
-            &v
-        )
         if err < 0 and data:
             data._remove()
         return err
