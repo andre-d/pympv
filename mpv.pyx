@@ -20,6 +20,7 @@ For more info see: https://github.com/mpv-player/mpv/blob/master/libmpv/client.h
 
 import sys
 from libc.stdlib cimport malloc, free
+
 from client cimport *
 
 __version__ = 0.1
@@ -272,6 +273,7 @@ cdef class Event(object):
         if self.id == MPV_EVENT_PROPERTY_CHANGE:
             userdata = _async_data[id(ctx)].get(event.reply_userdata, None)
             self.observed_property = userdata
+            ObservedSet._pump(ctx, self.data)
         else:
             userdata = _async_data[id(ctx)].pop(event.reply_userdata, None)
         self.reply_userdata = userdata.value() if userdata else None
@@ -635,6 +637,7 @@ cdef class Context(object):
         return err
 
     def __dealloc__(self):
+        ObservedSet._detatch(self)
         with nogil:
             mpv_terminate_destroy(self._ctx)
         del _callbacks[id(self)]
@@ -648,3 +651,5 @@ cdef void _c_callback(void* d) with gil:
         cb() if cb else None
     except Exception as e:
         sys.stderr.write("pympv error during callback: %s\n" % e)
+
+include "autobind.pyx"

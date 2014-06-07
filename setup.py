@@ -19,6 +19,7 @@ from distutils.core import setup
 from distutils.extension import Extension
 from distutils.command.clean import clean
 from Cython.Distutils import build_ext
+from Cython.Build import cythonize
 
 def tryremove(filename):
     if not os.path.isfile(filename):
@@ -43,5 +44,5 @@ setup(
         "build_ext": build_ext,
         "clean": Clean,
     },
-    ext_modules = [Extension("mpv", ["mpv.pyx"], libraries=['mpv'])]
+    ext_modules = cythonize([Extension("mpv", ["mpv.pyx"], libraries=['mpv'])])
 )
