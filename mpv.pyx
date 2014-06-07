@@ -630,7 +630,7 @@ cdef class Context(object):
 
     def __dealloc__(self):
         with nogil:
-            mpv_destroy(self._ctx)
+            mpv_terminate_destroy(self._ctx)
         del _callbacks[id(self)]
         del _async_data[id(self)]
 
