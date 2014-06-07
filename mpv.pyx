@@ -34,14 +34,14 @@ cdef int _ACTUAL_CLIENT_API_VERSION
 with nogil:
     _ACTUAL_CLIENT_API_VERSION = mpv_client_api_version()
 if _ACTUAL_CLIENT_API_VERSION >> 16 != _MPV_C_CLIENT_API_VERSION:
-    raise ImportError('libmpv version is incorrect')
+    raise ImportError("libmpv version is incorrect")
 
 _is_py3 = sys.version_info >= (3,)
-_strdec_err = 'surrogateescape' if _is_py3 else 'strict'
+_strdec_err = "surrogateescape" if _is_py3 else "strict"
 # mpv -> Python
 def _strdec(s):
     try:
-        return s.decode('utf-8', _strdec_err)
+        return s.decode("utf-8", _strdec_err)
     except UnicodeDecodeError:
         # In python2, bail to bytes on failure
         return bytes(s)
@@ -49,7 +49,7 @@ def _strdec(s):
 # Python -> mpv
 def _strenc(s):
     try:
-        return s.encode('utf-8', _strdec_err)
+        return s.encode("utf-8", _strdec_err)
     except UnicodeEncodeError:
         # In python2, assume bytes and walk right through
         return s
@@ -589,7 +589,7 @@ cdef class Context(object):
         with nogil:
             self._ctx = mpv_create()
         if not self._ctx:
-            raise MPVError('Context creation error')
+            raise MPVError("Context creation error")
         _callbacks[id(self)] = None
         _async_data[id(self)] = {}
 
