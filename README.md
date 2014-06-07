@@ -9,13 +9,13 @@ To use
 
     def main(args):
         if len(args) != 1:
-            print("pass a single media file as argument")
+            print('pass a single media file as argument')
             return 1
 
         try:
             m = mpv.Context()
         except mpv.MPVError:
-            print("failed creating context")
+            print('failed creating context')
             return 1
 
         m.set_option('input-default-bindings')
