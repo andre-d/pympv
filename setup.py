@@ -38,15 +38,9 @@ class Clean(clean):
             tryremove(f)
         clean.run(self)
 
-class ExtBuilder(build_ext):
-    def run(self):
-        if not os.path.isfile("client.pxd"):
-            call(["cwrap", "mpv/client.h", "client.pxd"])
-        build_ext.run(self)
-
 setup(
     cmdclass = {
-        "build_ext": ExtBuilder,
+        "build_ext": build_ext,
         "clean": Clean,
     },
     ext_modules = [Extension("mpv", ["mpv.pyx"], libraries=['mpv'])]
