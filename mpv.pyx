@@ -571,7 +571,7 @@ cdef class Context(object):
         with nogil:
             mpv_wakeup(self._ctx)
 
-    def set_wakeup_callback(self, callback, data):
+    def set_wakeup_callback(self, callback):
         """Wraps: mpv_set_wakeup_callback"""
         cdef int64_t name = id(self)
         _callbacks[id(self)] = callback
