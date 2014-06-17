@@ -449,20 +449,23 @@ cdef class Context(object):
         cdef const char** cmds = <const char**>malloc(lsize)
         if not cmds:
             raise MemoryError
-        cmdlist = [_strenc(cmd) for cmd in cmdlist]
-        for i, cmd in enumerate(cmdlist):
-            cmds[i] = <char*>cmd
-        cmds[i + 1] = NULL
         cdef int err
-        cdef uint64_t data_id = id(data)
-        if not async:
-            with nogil:
-                err = mpv_command(self._ctx, cmds)
-        else:
-            data = _AsyncData(self, data) if data is not None else None
-            with nogil:
-                err = mpv_command_async(self._ctx, data_id, cmds)
-        free(cmds)
+        cdef uint64_t data_id
+        try:
+            cmdlist = [_strenc(cmd) for cmd in cmdlist]
+            for i, cmd in enumerate(cmdlist):
+                cmds[i] = <char*>cmd
+            cmds[i + 1] = NULL
+            data_id = id(data)
+            if not async:
+                with nogil:
+                    err = mpv_command(self._ctx, cmds)
+            else:
+                data = _AsyncData(self, data) if data is not None else None
+                with nogil:
+                    err = mpv_command_async(self._ctx, data_id, cmds)
+        finally:
+            free(cmds)
         return err
 
     @_errors
@@ -505,9 +508,11 @@ cdef class Context(object):
             )
         if err < 0:
             raise MPVError(err)
-        v = _convert_node_value(result)
-        with nogil:
-            mpv_free_node_contents(&result)
+        try:
+            v = _convert_node_value(result)
+        finally:
+            with nogil:
+                mpv_free_node_contents(&result)
         return v
 
     @_errors
