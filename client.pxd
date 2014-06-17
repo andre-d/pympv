@@ -99,7 +99,7 @@ cdef extern from "mpv/client.h":
 
     int mpv_initialize(mpv_handle *ctx) nogil
 
-    void mpv_destroy(mpv_handle *ctx) nogil
+    void mpv_detach_destroy(mpv_handle *ctx) nogil
 
     void mpv_terminate_destroy(mpv_handle *ctx) nogil
 
