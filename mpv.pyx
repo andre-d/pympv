@@ -29,7 +29,7 @@ __author__ = "Andre D"
 cdef extern from "Python.h":
     void PyEval_InitThreads()
 
-_MPV_C_CLIENT_API_VERSION = 0
+_MPV_C_CLIENT_API_VERSION = 1
 
 cdef int _ACTUAL_CLIENT_API_VERSION
 with nogil:
