@@ -304,10 +304,10 @@ class MPVError(Exception):
         Exception.__init__(self, e)
 
 
-_callbacks = {}
+cdef _callbacks = {}
 
 
-_async_data = {}
+cdef _async_data = {}
 class _AsyncData:
     def __init__(self, ctx, data):
         self._group = id(ctx)
