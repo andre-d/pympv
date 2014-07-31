@@ -19,6 +19,7 @@ For more info see: https://github.com/mpv-player/mpv/blob/master/libmpv/client.h
 """
 
 import sys
+from threading import Thread
 from libc.stdlib cimport malloc, free
 
 from client cimport *
@@ -649,12 +650,15 @@ cdef class Context(object):
         del _async_data[id(self)]
 
 
+def callback_thread(cb):
+    try:
+        cb()
+    except Exception as e:
+        sys.stderr.write("pympv error during callback: %s\n" % e)
+
 cdef void _c_callback(void* d) with gil:
     name = <int64_t>d
     cb = _callbacks.get(name)
-    try:
-        cb() if cb else None
-    except Exception as e:
-        sys.stderr.write("pympv error during callback: %s\n" % e)
+    Thread(target=callback_thread, args=(cb,)).start() if cb else None
 
 include "autobind.pyx"
