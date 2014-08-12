@@ -662,10 +662,10 @@ class CallbackThread(Thread):
         self.lock = Lock()
         self.lock.acquire(True)
         self.callback = None
-        self.shutdown = False
+        self.isshutdown = False
 
     def shutdown(self):
-        self.shutdown = True
+        self.isshutdown = True
         self.callback = None
         self.lock.release()
 
@@ -673,12 +673,12 @@ class CallbackThread(Thread):
         self.lock.release()
 
     def set(self, callback):
-        if callback is not None:
+        if callback:
             callback = weakref.ref(callback)
         self.callback = callback
 
     def run(self):
-        while not self.shutdown:
+        while not self.isshutdown:
             self.lock.acquire(True)
             callback = self.callback() if self.callback else None
             self.mpv_callback(callback) if callback else None
