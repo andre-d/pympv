@@ -673,12 +673,14 @@ class CallbackThread(Thread):
         self.lock.release()
 
     def set(self, callback):
-        self.callback = weakref.ref(callback)
+        if callback is not None:
+            callback = weakref.ref(callback)
+        self.callback = callback
 
     def run(self):
         while not self.shutdown:
             self.lock.acquire(True)
-            callback = self.callback()
+            callback = self.callback() if self.callback else None
             self.mpv_callback(callback) if callback else None
 
     def mpv_callback(self, callback):
