@@ -19,7 +19,8 @@ For more info see: https://github.com/mpv-player/mpv/blob/master/libmpv/client.h
 """
 
 import sys
-from threading import Thread
+import weakref
+from threading import Thread, Lock
 from libc.stdlib cimport malloc, free
 
 from client cimport *
@@ -588,7 +589,7 @@ cdef class Context(object):
     def set_wakeup_callback(self, callback):
         """Wraps: mpv_set_wakeup_callback"""
         cdef int64_t name = id(self)
-        _callbacks[id(self)] = callback
+        _callbacks[id(self)].set(callback)
         with nogil:
             mpv_set_wakeup_callback(self._ctx, _c_callback, <void*>name)
 
@@ -604,8 +605,10 @@ cdef class Context(object):
             self._ctx = mpv_create()
         if not self._ctx:
             raise MPVError("Context creation error")
-        _callbacks[id(self)] = None
+        callback = CallbackThread()
+        _callbacks[id(self)] = callback
         _async_data[id(self)] = {}
+        callback.start()
 
     def observe_property(self, prop, data=None):
         """Wraps: mpv_observe_property"""
@@ -646,19 +649,44 @@ cdef class Context(object):
         ObservedSet._detatch(self)
         with nogil:
             mpv_terminate_destroy(self._ctx)
+        callback = _callbacks[id(self)]
+        callback.shutdown()
         del _callbacks[id(self)]
         del _async_data[id(self)]
 
+class CallbackThread(Thread):
+    def __init__(self):
+        Thread.__init__(self)
+        self.lock = Lock()
+        self.lock.acquire(True)
+        self.callback = None
+        self.shutdown = False
 
-def callback_thread(cb):
-    try:
-        cb()
-    except Exception as e:
-        sys.stderr.write("pympv error during callback: %s\n" % e)
+    def shutdown(self):
+        self.shutdown = True
+        self.callback = None
+        self.lock.release()
+
+    def call(self):
+        self.lock.release()
+
+    def set(self, callback):
+        self.callback = callback
+
+    def run(self):
+        while not self.shutdown:
+            self.lock.acquire(True)
+            self.mpv_callback() if self.callback else None
+
+    def mpv_callback(self):
+        try:
+            self.callback()
+        except Exception as e:
+            sys.stderr.write("pympv error during callback: %s\n" % e)
 
 cdef void _c_callback(void* d) with gil:
     name = <int64_t>d
-    cb = _callbacks.get(name)
-    Thread(target=callback_thread, args=(cb,)).start() if cb else None
+    callback = _callbacks.get(name)
+    callback.call()
 
 include "autobind.pyx"
