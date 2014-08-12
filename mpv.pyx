@@ -152,7 +152,7 @@ cdef class InputDispatch(object):
 
 cdef class LogMessage(object):
     """Data field for MPV_EVENT_LOG_MESSAGE events.
-    
+
     Wraps: mpv_event_log_message
     """
     cdef public object prefix, level, text
@@ -293,7 +293,7 @@ def _errors(fn):
 
 class MPVError(Exception):
     code = None
-    
+
     def __init__(self, e):
         self.code = e
         cdef const char* err_c
@@ -324,7 +324,7 @@ class _AsyncData:
 
 
 class ObservedProperty(_AsyncData):
-    pass 
+    pass
 
 
 cdef class Context(object):
@@ -478,7 +478,7 @@ cdef class Context(object):
 
         Arguments:
         prop: Property to get the value of.
-        
+
         Keyword arguments:
         data: Value to be passed into the reply_userdata of the response event.
         Wraps: mpv_get_property_async"""
