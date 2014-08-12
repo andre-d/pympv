@@ -304,11 +304,12 @@ class MPVError(Exception):
             e = _strdec(err_c)
         Exception.__init__(self, e)
 
+cdef _callbacks = weakref.WeakValueDictionary()
 
-cdef _callbacks = {}
+class _AsyncDataSet(dict):
+    pass
 
-
-cdef _async_data = {}
+cdef _async_data = weakref.WeakValueDictionary()
 class _AsyncData:
     def __init__(self, ctx, data):
         self._group = id(ctx)
@@ -335,6 +336,7 @@ cdef class Context(object):
     """
 
     cdef mpv_handle *_ctx
+    cdef object callback, callbackthread, async_data
 
     @property
     def name(self):
@@ -589,7 +591,8 @@ cdef class Context(object):
     def set_wakeup_callback(self, callback):
         """Wraps: mpv_set_wakeup_callback"""
         cdef int64_t name = id(self)
-        _callbacks[id(self)].set(callback)
+        self.callback = callback
+        self.callbackthread.set(callback)
         with nogil:
             mpv_set_wakeup_callback(self._ctx, _c_callback, <void*>name)
 
@@ -605,10 +608,11 @@ cdef class Context(object):
             self._ctx = mpv_create()
         if not self._ctx:
             raise MPVError("Context creation error")
-        callback = CallbackThread()
-        _callbacks[id(self)] = callback
-        _async_data[id(self)] = {}
-        callback.start()
+        self.callbackthread = CallbackThread()
+        _callbacks[id(self)] = self.callbackthread
+        self.async_data = _AsyncDataSet()
+        _async_data[id(self)] = self.async_data
+        self.callbackthread.start()
 
     def observe_property(self, prop, data=None):
         """Wraps: mpv_observe_property"""
@@ -649,14 +653,12 @@ cdef class Context(object):
         ObservedSet._detatch(self)
         with nogil:
             mpv_terminate_destroy(self._ctx)
-        callback = _callbacks[id(self)]
-        callback.shutdown()
-        del _callbacks[id(self)]
-        del _async_data[id(self)]
+        self.callbackthread.shutdown()
 
 class CallbackThread(Thread):
     def __init__(self):
         Thread.__init__(self)
+        self.daemon = True
         self.lock = Lock()
         self.lock.acquire(True)
         self.callback = None
@@ -671,16 +673,17 @@ class CallbackThread(Thread):
         self.lock.release()
 
     def set(self, callback):
-        self.callback = callback
+        self.callback = weakref.ref(callback)
 
     def run(self):
         while not self.shutdown:
             self.lock.acquire(True)
-            self.mpv_callback() if self.callback else None
+            callback = self.callback()
+            self.mpv_callback(callback) if callback else None
 
-    def mpv_callback(self):
+    def mpv_callback(self, callback):
         try:
-            self.callback()
+            callback()
         except Exception as e:
             sys.stderr.write("pympv error during callback: %s\n" % e)
 
