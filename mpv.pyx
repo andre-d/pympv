@@ -497,6 +497,18 @@ cdef class Context(object):
             data._remove()
         return err
 
+    def try_get_property_async(self, prop, data=None, default=None):
+        try:
+            return self.get_property_async(prop, data=data)
+        except MPVError:
+            return default
+
+    def try_get_property(self, prop, default=None):
+        try:
+            return self.get_property(prop)
+        except MPVError:
+            return default
+
     def get_property(self, prop):
         """Wraps: mpv_get_property"""
         cdef mpv_node result
