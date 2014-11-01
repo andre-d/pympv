@@ -275,7 +275,6 @@ cdef class Event(object):
         if self.id == MPV_EVENT_PROPERTY_CHANGE:
             userdata = _async_data[id(ctx)].get(event.reply_userdata, None)
             self.observed_property = userdata
-            ObservedSet._pump(ctx, self.data)
         else:
             userdata = _async_data[id(ctx)].pop(event.reply_userdata, None)
         self.reply_userdata = userdata.value() if userdata else None
@@ -662,7 +661,6 @@ cdef class Context(object):
         return err
 
     def __dealloc__(self):
-        ObservedSet._detatch(self)
         with nogil:
             mpv_terminate_destroy(self._ctx)
         self.callbackthread.shutdown()
@@ -705,5 +703,3 @@ cdef void _c_callback(void* d) with gil:
     name = <int64_t>d
     callback = _callbacks.get(name)
     callback.call()
-
-include "autobind.pyx"
