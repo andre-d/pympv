@@ -525,8 +525,7 @@ cdef class Context(object):
 
         Wraps: mpv_command_node and mpv_command_node_async
         """
-        value = cmdlist if len(cmdlist) > 1 else cmdlist[0] if cmdlist else None
-        cdef mpv_node node = self._prep_native_value(value, self._format_for(value))
+        cdef mpv_node node = self._prep_native_value(cmdlist, self._format_for(cmdlist))
         cdef mpv_node noderesult
         cdef int err
         cdef uint64_t data_id
