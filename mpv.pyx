@@ -505,11 +505,11 @@ cdef class Context(object):
             for i in range(node.u.list.num):
                 self._free_native_value(node.u.list.values[i])
             free(node.u.list.values)
-            free(node.u.list)
             if node.format == MPV_FORMAT_NODE_MAP:
                 for i in range(node.u.list.num):
                     free(node.u.list.keys[i])
                 free(node.u.list.keys)
+            free(node.u.list)
 
     def command(self, *cmdlist, async=False, data=None):
         """Send a command to mpv.
