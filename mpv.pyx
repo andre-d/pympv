@@ -22,7 +22,7 @@ import sys
 import weakref
 from threading import Thread, Lock
 from libc.stdlib cimport malloc, free
-from libc.string cimport strlen, strcpy
+from libc.string cimport strcpy
 
 from client cimport *
 
