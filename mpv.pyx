@@ -22,22 +22,31 @@ import sys
 import weakref
 from threading import Thread, Lock
 from libc.stdlib cimport malloc, free
+from libc.string cimport strlen, strcpy
 
 from client cimport *
 
-__version__ = 0.1
+__version__ = 0.2
 __author__ = "Andre D"
+
+_REQUIRED_CAPI_MAJOR = 1
+_MIN_CAPI_MINOR = 9
+
+cdef unsigned long _CAPI_VERSION
+with nogil:
+    _CAPI_VERSION = mpv_client_api_version()
+
+_CAPI_MAJOR = _CAPI_VERSION >> 16
+_CAPI_MINOR = _CAPI_VERSION & 0xFFFF
+
+if _CAPI_MAJOR != _REQUIRED_CAPI_MAJOR or _CAPI_MINOR < _MIN_CAPI_MINOR:
+    raise ImportError(
+        "libmpv version is incorrect. Required %d.%d got %d.%d." %
+            (_REQUIRED_CAPI_MAJOR, _MIN_CAPI_MINOR, _CAPI_MAJOR, _CAPI_MINOR)
+    )
 
 cdef extern from "Python.h":
     void PyEval_InitThreads()
-
-_MPV_C_CLIENT_API_VERSION = 1
-
-cdef int _ACTUAL_CLIENT_API_VERSION
-with nogil:
-    _ACTUAL_CLIENT_API_VERSION = mpv_client_api_version()
-if _ACTUAL_CLIENT_API_VERSION >> 16 != _MPV_C_CLIENT_API_VERSION:
-    raise ImportError("libmpv version is incorrect")
 
 _is_py3 = sys.version_info >= (3,)
 _strdec_err = "surrogateescape" if _is_py3 else "strict"
@@ -79,6 +88,11 @@ class Errors:
     property_unavailable = MPV_ERROR_PROPERTY_UNAVAILABLE
     property_error = MPV_ERROR_PROPERTY_ERROR
     command_error = MPV_ERROR_COMMAND
+    loading_failed = MPV_ERROR_LOADING_FAILED
+    ao_init_failed = MPV_ERROR_AO_INIT_FAILED
+    vo_init_failed = MPV_ERROR_VO_INIT_FAILED
+    nothing_to_play = MPV_ERROR_NOTHING_TO_PLAY
+    unknown_format = MPV_ERROR_UNKNOWN_FORMAT
 
 
 class Events:
@@ -114,15 +128,26 @@ class Events:
     chapter_change = MPV_EVENT_CHAPTER_CHANGE
 
 
+class LogLevels:
+    no = MPV_LOG_LEVEL_NONE
+    fatal = MPV_LOG_LEVEL_FATAL
+    error = MPV_LOG_LEVEL_ERROR
+    warn = MPV_LOG_LEVEL_WARN
+    info = MPV_LOG_LEVEL_INFO
+    v = MPV_LOG_LEVEL_V
+    debug = MPV_LOG_LEVEL_DEBUG
+    trace = MPV_LOG_LEVEL_TRACE
+
+
 class EOFReasons:
     """Known possible values for EndOfFileReached reason.
 
     You should handle the possibility that the reason may not be any of these values.
     """
-    eof = 0
-    restarted = 1
-    aborted = 2
-    quit = 3
+    eof = MPV_END_FILE_REASON_EOF
+    aborted = MPV_END_FILE_REASON_STOP
+    quit = MPV_END_FILE_REASON_QUIT
+    error = MPV_END_FILE_REASON_ERROR
 
 
 cdef class EndOfFileReached(object):
@@ -130,10 +155,11 @@ cdef class EndOfFileReached(object):
 
     Wraps: mpv_event_end_file
     """
-    cdef public object reason
+    cdef public object reason, error
 
     cdef _init(self, mpv_event_end_file* eof):
         self.reason = eof.reason
+        self.error = eof.error
         return self
 
 
@@ -155,12 +181,13 @@ cdef class LogMessage(object):
 
     Wraps: mpv_event_log_message
     """
-    cdef public object prefix, level, text
+    cdef public object prefix, level, text, log_level
 
     cdef _init(self, mpv_event_log_message* msg):
         self.level = _strdec(msg.level)
         self.prefix = _strdec(msg.prefix)
         self.text = _strdec(msg.text)
+        self.log_level = msg.log_level
         return self
 
 
@@ -417,7 +444,41 @@ cdef class Context(object):
             return MPV_FORMAT_INT64
         elif isinstance(value, float):
             return MPV_FORMAT_DOUBLE
+        elif isinstance(value, (tuple, list)):
+            return MPV_FORMAT_NODE_ARRAY
+        elif isinstance(value, dict):
+            return MPV_FORMAT_NODE_MAP
         return MPV_FORMAT_NONE
+
+    cdef mpv_node_list* _prep_node_list(self, values):
+        cdef mpv_node node
+        cdef mpv_format format
+        cdef mpv_node_list* node_list = <mpv_node_list*>malloc(sizeof(mpv_node_list))
+        node_list.num = len(values)
+        node_list.values = NULL
+        node_list.keys = NULL
+        if node_list.num:
+            node_list.values = <mpv_node*>malloc(node_list.num * sizeof(mpv_node))
+        for i, value in enumerate(values):
+            format = self._format_for(value)
+            node = self._prep_native_value(value, format)
+            node_list.values[i] = node
+        return node_list
+
+    cdef mpv_node_list* _prep_node_map(self, map):
+        cdef char* ckey
+        cdef mpv_node_list* list
+        list = self._prep_node_list(map.values())
+        keys = map.keys()
+        if not len(keys):
+            return list
+        list.keys = <char**>malloc(list.num)
+        for i, key in enumerate(keys):
+            key = _strenc(key)
+            ckey = key
+            list.keys[i] = <char*>malloc(len(key))
+            strcpy(list.keys[i], ckey)
+        return list
 
     cdef mpv_node _prep_native_value(self, value, format):
         cdef mpv_node node
@@ -431,45 +492,64 @@ cdef class Context(object):
             node.u.int64 = value
         elif format == MPV_FORMAT_DOUBLE:
             node.u.double_ = value
+        elif format == MPV_FORMAT_NODE_ARRAY:
+            node.u.list = self._prep_node_list(value)
+        elif format == MPV_FORMAT_NODE_MAP:
+            node.u.list = self._prep_node_map(value)
         else:
             node.format = MPV_FORMAT_NONE
         return node
 
-    @_errors
+    cdef _free_native_value(self, mpv_node node):
+        if node.format in (MPV_FORMAT_NODE_ARRAY, MPV_FORMAT_NODE_MAP):
+            for i in range(node.u.list.num):
+                self._free_native_value(node.u.list.values[i])
+            free(node.u.list.values)
+            free(node.u.list)
+            if node.format == MPV_FORMAT_NODE_MAP:
+                for i in range(node.u.list.num):
+                    free(node.u.list.keys[i])
+                free(node.u.list.keys)
+
     def command(self, *cmdlist, async=False, data=None):
         """Send a command to mpv.
 
+        Non-async success returns the command's response data, otherwise None
+
         Arguments:
-        Accepts parameters as args, not a single string.
+        Accepts parameters as args
 
         Keyword Arguments:
         async: True will return right away, status comes in as MPV_EVENT_COMMAND_REPLY
         data: Only valid if async, gets sent back as reply_userdata in the Event
 
-        Wraps: mpv_command and mpv_command_async
+        Wraps: mpv_command_node and mpv_command_node_async
         """
-        lsize = (len(cmdlist) + 1) * sizeof(void*)
-        cdef const char** cmds = <const char**>malloc(lsize)
-        if not cmds:
-            raise MemoryError
+        value = cmdlist if len(cmdlist) > 1 else cmdlist[0] if cmdlist else None
+        cdef mpv_node node = self._prep_native_value(value, self._format_for(value))
+        cdef mpv_node noderesult
         cdef int err
         cdef uint64_t data_id
+        result = None
         try:
-            cmdlist = [_strenc(cmd) for cmd in cmdlist]
-            for i, cmd in enumerate(cmdlist):
-                cmds[i] = <char*>cmd
-            cmds[i + 1] = NULL
             data_id = id(data)
             if not async:
                 with nogil:
-                    err = mpv_command(self._ctx, cmds)
+                    err = mpv_command_node(self._ctx, &node, &noderesult)
+                try:
+                    result = _convert_node_value(noderesult) if err >= 0 else None
+                finally:
+                    with nogil:
+                        mpv_free_node_contents(&noderesult)
             else:
                 data = _AsyncData(self, data) if data is not None else None
                 with nogil:
-                    err = mpv_command_async(self._ctx, data_id, cmds)
+                    err = mpv_command_node_async(self._ctx, data_id, &node)
         finally:
-            free(cmds)
-        return err
+            self._free_native_value(node)
+        if err < 0:
+            raise MPVError(err)
+        return result
 
     @_errors
     def get_property_async(self, prop, data=None):
@@ -537,26 +617,31 @@ cdef class Context(object):
         cdef mpv_format format = self._format_for(value)
         cdef mpv_node v = self._prep_native_value(value, format)
         cdef int err
-        cdef const char* prop_c = prop
-        if not async:
+        cdef int data_id
+        cdef const char* prop_c
+        try:
+            prop_c = prop
+            if not async:
+                with nogil:
+                    err = mpv_set_property(
+                        self._ctx,
+                        prop_c,
+                        MPV_FORMAT_NODE,
+                        &v
+                    )
+                return err
+            data = _AsyncData(self, data) if data is not None else None
+            data_id = id(data)
             with nogil:
-                err = mpv_set_property(
+                err = mpv_set_property_async(
                     self._ctx,
+                    data_id,
                     prop_c,
                     MPV_FORMAT_NODE,
                     &v
                 )
-            return err
-        data = _AsyncData(self, data) if data is not None else None
-        cdef int data_id = id(data)
-        with nogil:
-            err = mpv_set_property_async(
-                self._ctx,
-                data_id,
-                prop_c,
-                MPV_FORMAT_NODE,
-                &v
-            )
+        finally:
+            self._free_native_value(v)
         if err < 0 and data:
             data._remove()
         return err
@@ -568,14 +653,18 @@ cdef class Context(object):
         cdef mpv_format format = self._format_for(value)
         cdef mpv_node v = self._prep_native_value(value, format)
         cdef int err
-        cdef const char* prop_c = prop
-        with nogil:
-            err = mpv_set_option(
-                self._ctx,
-                prop_c,
-                MPV_FORMAT_NODE,
-                &v
-            )
+        cdef const char* prop_c
+        try:
+            prop_c = prop
+            with nogil:
+                err = mpv_set_option(
+                    self._ctx,
+                    prop_c,
+                    MPV_FORMAT_NODE,
+                    &v
+                )
+        finally:
+            self._free_native_value(v)
         return err
 
     @_errors

@@ -20,13 +20,14 @@ To use
 
         m.set_option('input-default-bindings')
         m.set_option('osc')
+        m.set_option('input-vo-keyboard')
         m.initialize()
 
         m.command('loadfile', args[0])
 
         while True:
             event = m.wait_event(.01)
-            if event.id  == mpv.Events.none:
+            if event.id == mpv.Events.none:
                 continue
             print(event.name)
             if event.id in [mpv.Events.end_file, mpv.Events.shutdown]:
