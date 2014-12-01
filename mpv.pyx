@@ -485,7 +485,8 @@ cdef class Context(object):
         node.format = format
         if format == MPV_FORMAT_STRING:
             value = _strenc(value)
-            node.u.string = value
+            node.u.string = <char*>malloc(len(value) + 1)
+            strcpy(node.u.string, value)
         elif format == MPV_FORMAT_FLAG:
             node.u.flag = 1 if value else 0
         elif format == MPV_FORMAT_INT64:
@@ -510,6 +511,8 @@ cdef class Context(object):
                     free(node.u.list.keys[i])
                 free(node.u.list.keys)
             free(node.u.list)
+        elif node.format == MPV_FORMAT_STRING:
+            free(node.u.string)
 
     def command(self, *cmdlist, async=False, data=None):
         """Send a command to mpv.
