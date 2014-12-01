@@ -476,7 +476,7 @@ cdef class Context(object):
         for i, key in enumerate(keys):
             key = _strenc(key)
             ckey = key
-            list.keys[i] = <char*>malloc(len(key))
+            list.keys[i] = <char*>malloc(len(key) + 1)
             strcpy(list.keys[i], ckey)
         return list
 
