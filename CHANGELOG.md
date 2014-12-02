@@ -1,6 +1,12 @@
 pympv
 =====
 
+## 0.2.1
+
+- Fix possible failures setting property to a map
+- Fix possible failures with every single string
+
+
 ## 0.2
 
 - EOFReasons.restart removed to reflect client.h enum
