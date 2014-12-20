@@ -774,6 +774,7 @@ cdef class Context(object):
         self.callbackthread.shutdown()
         del _callbacks[id(self)]
         del _async_data[id(self)]
+        self._ctx = NULL
 
     def __dealloc__(self):
         self.shutdown()
