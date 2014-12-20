@@ -19,7 +19,6 @@ For more info see: https://github.com/mpv-player/mpv/blob/master/libmpv/client.h
 """
 
 import sys
-import weakref
 from threading import Thread, Lock
 from libc.stdlib cimport malloc, free
 from libc.string cimport strcpy
@@ -330,12 +329,12 @@ class MPVError(Exception):
             e = _strdec(err_c)
         Exception.__init__(self, e)
 
-cdef _callbacks = weakref.WeakValueDictionary()
+cdef _callbacks = dict()
 
 class _AsyncDataSet(dict):
     pass
 
-cdef _async_data = weakref.WeakValueDictionary()
+cdef _async_data = dict()
 class _AsyncData:
     def __init__(self, ctx, data):
         self._group = id(ctx)
@@ -360,7 +359,6 @@ cdef class Context(object):
 
     Wraps: mpv_create, mpv_destroy and all mpv_handle related calls
     """
-
     cdef mpv_handle *_ctx
     cdef object callback, callbackthread, async_data
 
@@ -371,6 +369,7 @@ cdef class Context(object):
         Wraps: mpv_client_name
         """
         cdef const char* name
+        assert self._ctx
         with nogil:
             name = mpv_client_name(self._ctx)
         return _strdec(name)
@@ -384,17 +383,20 @@ cdef class Context(object):
         Wraps: mpv_get_time_us
         """
         cdef int64_t time
+        assert self._ctx
         with nogil:
             time = mpv_get_time_us(self._ctx)
         return time
 
     def suspend(self):
         """Wraps: mpv_suspend"""
+        assert self._ctx
         with nogil:
             mpv_suspend(self._ctx)
 
     def resume(self):
         """Wraps: mpv_resume"""
+        assert self._ctx
         with nogil:
             mpv_resume(self._ctx)
 
@@ -408,6 +410,7 @@ cdef class Context(object):
 
         Wraps: mpv_request_event
         """
+        assert self._ctx
         cdef int enable_i = 1 if enable else 0
         cdef int err
         cdef mpv_event_id event_id = event
@@ -418,6 +421,7 @@ cdef class Context(object):
     @_errors
     def set_log_level(self, loglevel):
         """Wraps: mpv_request_log_messages"""
+        assert self._ctx
         loglevel = _strenc(loglevel)
         cdef const char* loglevel_c = loglevel
         cdef int err
@@ -428,6 +432,7 @@ cdef class Context(object):
     @_errors
     def load_config(self, filename):
         """Wraps: mpv_load_config_file"""
+        assert self._ctx
         filename = _strenc(filename)
         cdef const char* _filename = filename
         cdef int err
@@ -528,6 +533,7 @@ cdef class Context(object):
 
         Wraps: mpv_command_node and mpv_command_node_async
         """
+        assert self._ctx
         cdef mpv_node node = self._prep_native_value(cmdlist, self._format_for(cmdlist))
         cdef mpv_node noderesult
         cdef int err
@@ -563,6 +569,7 @@ cdef class Context(object):
         Keyword arguments:
         data: Value to be passed into the reply_userdata of the response event.
         Wraps: mpv_get_property_async"""
+        assert self._ctx
         prop = _strenc(prop)
         data = _AsyncData(self, data) if data is not None else None
         cdef uint64_t id_data = id(data)
@@ -592,6 +599,7 @@ cdef class Context(object):
 
     def get_property(self, prop):
         """Wraps: mpv_get_property"""
+        assert self._ctx
         cdef mpv_node result
         prop = _strenc(prop)
         cdef const char* prop_c = prop
@@ -615,6 +623,7 @@ cdef class Context(object):
     @_errors
     def set_property(self, prop, value=True, async=False, data=None):
         """Wraps: mpv_set_property and mpv_set_property_async"""
+        assert self._ctx
         prop = _strenc(prop)
         cdef mpv_format format = self._format_for(value)
         cdef mpv_node v = self._prep_native_value(value, format)
@@ -651,6 +660,7 @@ cdef class Context(object):
     @_errors
     def set_option(self, prop, value=True):
         """Wraps: mpv_set_option"""
+        assert self._ctx
         prop = _strenc(prop)
         cdef mpv_format format = self._format_for(value)
         cdef mpv_node v = self._prep_native_value(value, format)
@@ -672,6 +682,7 @@ cdef class Context(object):
     @_errors
     def initialize(self):
         """Wraps: mpv_initialize"""
+        assert self._ctx
         cdef int err
         with nogil:
             err = mpv_initialize(self._ctx)
@@ -679,6 +690,7 @@ cdef class Context(object):
 
     def wait_event(self, timeout=None):
         """Wraps: mpv_wait_event"""
+        assert self._ctx
         cdef double timeout_d = timeout if timeout is not None else -1
         cdef mpv_event* event
         with nogil:
@@ -687,11 +699,13 @@ cdef class Context(object):
 
     def wakeup(self):
         """Wraps: mpv_wakeup"""
+        assert self._ctx
         with nogil:
             mpv_wakeup(self._ctx)
 
     def set_wakeup_callback(self, callback):
         """Wraps: mpv_set_wakeup_callback"""
+        assert self._ctx
         cdef int64_t name = id(self)
         self.callback = callback
         self.callbackthread.set(callback)
@@ -700,6 +714,7 @@ cdef class Context(object):
 
     def get_wakeup_pipe(self):
         """Wraps: mpv_get_wakeup_pipe"""
+        assert self._ctx
         cdef int pipe
         with nogil:
             pipe = mpv_get_wakeup_pipe(self._ctx)
@@ -718,6 +733,7 @@ cdef class Context(object):
 
     def observe_property(self, prop, data=None):
         """Wraps: mpv_observe_property"""
+        assert self._ctx
         new = False
         if data is not None and not isinstance(data, ObservedProperty):
             new = True
@@ -741,6 +757,7 @@ cdef class Context(object):
     @_errors
     def unobserve_property(self, data):
         """Wraps: mpv_unobserve_property"""
+        assert self._ctx
         data._remove() if data else None
         cdef uint64_t id_data = id(data)
         cdef int err
@@ -751,10 +768,15 @@ cdef class Context(object):
             )
         return err
 
-    def __dealloc__(self):
+    def shutdown(self):
         with nogil:
             mpv_terminate_destroy(self._ctx)
         self.callbackthread.shutdown()
+        del _callbacks[id(self)]
+        del _async_data[id(self)]
+
+    def __dealloc__(self):
+        self.shutdown()
 
 class CallbackThread(Thread):
     def __init__(self):
@@ -774,15 +796,12 @@ class CallbackThread(Thread):
         self.lock.release()
 
     def set(self, callback):
-        if callback:
-            callback = weakref.ref(callback)
         self.callback = callback
 
     def run(self):
         while not self.isshutdown:
             self.lock.acquire(True)
-            callback = self.callback() if self.callback else None
-            self.mpv_callback(callback) if callback else None
+            self.mpv_callback(self.callback) if self.callback else None
 
     def mpv_callback(self, callback):
         try:
