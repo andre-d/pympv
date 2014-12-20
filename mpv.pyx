@@ -721,14 +721,15 @@ cdef class Context(object):
         return pipe
 
     def __cinit__(self):
+        cdef int64_t ctxid = <int64_t>id(self)
         with nogil:
             self._ctx = mpv_create()
         if not self._ctx:
             raise MPVError("Context creation error")
         self.callbackthread = CallbackThread()
-        _callbacks[id(self)] = self.callbackthread
+        _callbacks[ctxid] = self.callbackthread
         self.async_data = _AsyncDataSet()
-        _async_data[id(self)] = self.async_data
+        _async_data[ctxid] = self.async_data
         self.callbackthread.start()
 
     def observe_property(self, prop, data=None):
@@ -769,11 +770,12 @@ cdef class Context(object):
         return err
 
     def shutdown(self):
+        cdef int64_t ctxid = <int64_t>id(self)
         with nogil:
             mpv_terminate_destroy(self._ctx)
         self.callbackthread.shutdown()
-        del _callbacks[id(self)]
-        del _async_data[id(self)]
+        del _callbacks[ctxid]
+        del _async_data[ctxid]
         self._ctx = NULL
 
     def __dealloc__(self):
@@ -811,6 +813,6 @@ class CallbackThread(Thread):
             sys.stderr.write("pympv error during callback: %s\n" % e)
 
 cdef void _c_callback(void* d) with gil:
-    name = <int64_t>d
+    cdef int64_t name = <int64_t>d
     callback = _callbacks.get(name)
     callback.call()
