@@ -19,7 +19,7 @@ For more info see: https://github.com/mpv-player/mpv/blob/master/libmpv/client.h
 """
 
 import sys
-from threading import Thread, Lock
+from threading import Thread, Semaphore
 from libc.stdlib cimport malloc, free
 from libc.string cimport strcpy
 
@@ -785,7 +785,7 @@ class CallbackThread(Thread):
     def __init__(self):
         Thread.__init__(self)
         self.daemon = True
-        self.lock = Lock()
+        self.lock = Semaphore()
         self.lock.acquire(True)
         self.callback = None
         self.isshutdown = False
