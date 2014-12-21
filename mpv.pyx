@@ -735,6 +735,7 @@ cdef class Context(object):
         _reply_userdatas[ctxid] = self.reply_userdata
         self.callbackthread.start()
 
+    @_errors
     def observe_property(self, prop, data=None):
         """Wraps: mpv_observe_property"""
         assert self._ctx
@@ -754,9 +755,7 @@ cdef class Context(object):
                 propc,
                 MPV_FORMAT_NODE,
             )
-        if err < 0:
-            raise MPVError(err)
-        return data
+        return err
 
     @_errors
     def unobserve_property(self, data):
