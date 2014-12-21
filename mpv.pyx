@@ -628,7 +628,7 @@ cdef class Context(object):
         cdef mpv_format format = self._format_for(value)
         cdef mpv_node v = self._prep_native_value(value, format)
         cdef int err
-        cdef int data_id
+        cdef uint64_t data_id
         cdef const char* prop_c
         try:
             prop_c = prop
@@ -642,7 +642,7 @@ cdef class Context(object):
                     )
                 return err
             data = _AsyncData(self, data) if data is not None else None
-            data_id = id(data)
+            data_id = <uint64_t>id(data)
             with nogil:
                 err = mpv_set_property_async(
                     self._ctx,
@@ -706,7 +706,7 @@ cdef class Context(object):
     def set_wakeup_callback(self, callback):
         """Wraps: mpv_set_wakeup_callback"""
         assert self._ctx
-        cdef int64_t name = id(self)
+        cdef uint64_t name = <uint64_t>id(self)
         self.callback = callback
         self.callbackthread.set(callback)
         with nogil:
@@ -721,7 +721,7 @@ cdef class Context(object):
         return pipe
 
     def __cinit__(self):
-        cdef int64_t ctxid = <int64_t>id(self)
+        cdef uint64_t ctxid = <uint64_t>id(self)
         with nogil:
             self._ctx = mpv_create()
         if not self._ctx:
@@ -742,7 +742,7 @@ cdef class Context(object):
         prop = _strenc(prop)
         cdef char* propc = prop
         cdef int err
-        cdef uint64_t id_data = id(data)
+        cdef uint64_t id_data = <uint64_t>id(data)
         with nogil:
             err = mpv_observe_property(
                 self._ctx,
@@ -760,7 +760,7 @@ cdef class Context(object):
         """Wraps: mpv_unobserve_property"""
         assert self._ctx
         data._remove() if data else None
-        cdef uint64_t id_data = id(data)
+        cdef uint64_t id_data = <uint64_t>id(data)
         cdef int err
         with nogil:
             err = mpv_unobserve_property(
@@ -770,7 +770,7 @@ cdef class Context(object):
         return err
 
     def shutdown(self):
-        cdef int64_t ctxid = <int64_t>id(self)
+        cdef uint64_t ctxid = <uint64_t>id(self)
         with nogil:
             mpv_terminate_destroy(self._ctx)
         self.callbackthread.shutdown()
@@ -813,6 +813,6 @@ class CallbackThread(Thread):
             sys.stderr.write("pympv error during callback: %s\n" % e)
 
 cdef void _c_callback(void* d) with gil:
-    cdef int64_t name = <int64_t>d
+    cdef uint64_t name = <uint64_t>d
     callback = _callbacks.get(name)
     callback.call()
