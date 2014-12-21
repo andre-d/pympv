@@ -92,6 +92,8 @@ class Errors:
     vo_init_failed = MPV_ERROR_VO_INIT_FAILED
     nothing_to_play = MPV_ERROR_NOTHING_TO_PLAY
     unknown_format = MPV_ERROR_UNKNOWN_FORMAT
+    unsupported = MPV_ERROR_UNSUPPORTED
+    not_implemented = MPV_ERROR_NOT_IMPLEMENTED
 
 
 class Events:

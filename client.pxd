@@ -93,6 +93,8 @@ cdef extern from "mpv/client.h":
         MPV_ERROR_VO_INIT_FAILED = -15
         MPV_ERROR_NOTHING_TO_PLAY = -16
         MPV_ERROR_UNKNOWN_FORMAT = -17
+        MPV_ERROR_UNSUPPORTED = -18
+        MPV_ERROR_NOT_IMPLEMENTED = -19
 
     const char *mpv_error_string(int error) nogil
 
