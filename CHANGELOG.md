@@ -1,6 +1,13 @@
 pympv
 =====
 
+## 0.3.0
+
+- Fix various failures of data and callbacks
+- Sync up header with new errors from 1.11
+- Add shutdown() to cleanup a context, GCing the context calls this
+- Callbacks and data are no longer associated weakly
+
 ## 0.2.1
 
 - Fix possible failures setting property to a map
