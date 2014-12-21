@@ -255,7 +255,7 @@ cdef class Event(object):
     """Wraps: mpv_event"""
     cdef public mpv_event_id id
     cdef public int error
-    cdef public object data, reply_userdata, observed_property
+    cdef public object data, reply_userdata
 
     @property
     def error_str(self):
@@ -298,14 +298,17 @@ cdef class Event(object):
         return _strdec(name_c)
 
     cdef _init(self, mpv_event* event, ctx):
+        cdef uint64_t ctxid = <uint64_t>id(ctx)
         self.id = event.event_id
         self.data = self._data(event)
-        if self.id == MPV_EVENT_PROPERTY_CHANGE:
-            userdata = _async_data[id(ctx)].get(event.reply_userdata, None)
-            self.observed_property = userdata
-        else:
-            userdata = _async_data[id(ctx)].pop(event.reply_userdata, None)
-        self.reply_userdata = userdata.value() if userdata else None
+        userdata = _reply_userdatas[ctxid].get(event.reply_userdata, None)
+        if userdata is not None and self.id != MPV_EVENT_PROPERTY_CHANGE:
+            userdata.remove()
+            if not userdata.observed and userdata.counter <= 0:
+                del _reply_userdatas[ctxid][event.reply_userdata]
+        if userdata is not None:
+            userdata = userdata.data
+        self.reply_userdata = userdata
         self.error = event.error
         return self
 
@@ -332,26 +335,19 @@ class MPVError(Exception):
         Exception.__init__(self, e)
 
 cdef _callbacks = dict()
+cdef _reply_userdatas = dict()
 
-class _AsyncDataSet(dict):
-    pass
+class _ReplyUserData(object):
+    def __init__(self, data):
+        self.counter = 0
+        self.data = data
+        self.observed = False
 
-cdef _async_data = dict()
-class _AsyncData:
-    def __init__(self, ctx, data):
-        self._group = id(ctx)
-        self._data = data
-        _async_data[self._group][id(self)] = self
+    def add(self):
+        self.counter += 1
 
-    def _remove(self):
-        _async_data[self._group].pop(id(self))
-
-    def value(self):
-        return self._data
-
-
-class ObservedProperty(_AsyncData):
-    pass
+    def remove(self):
+        self.counter -= 1
 
 
 cdef class Context(object):
@@ -362,7 +358,7 @@ cdef class Context(object):
     Wraps: mpv_create, mpv_destroy and all mpv_handle related calls
     """
     cdef mpv_handle *_ctx
-    cdef object callback, callbackthread, async_data
+    cdef object callback, callbackthread, reply_userdata
 
     @property
     def name(self):
@@ -552,7 +548,10 @@ cdef class Context(object):
                     with nogil:
                         mpv_free_node_contents(&noderesult)
             else:
-                data = _AsyncData(self, data) if data is not None else None
+                userdatas = self.reply_userdata.get(data_id, None)
+                if userdatas is None:
+                    _reply_userdatas[data_id] = userdatas = _ReplyUserData(data)
+                userdatas.add()
                 with nogil:
                     err = mpv_command_node_async(self._ctx, data_id, &node)
         finally:
@@ -573,8 +572,11 @@ cdef class Context(object):
         Wraps: mpv_get_property_async"""
         assert self._ctx
         prop = _strenc(prop)
-        data = _AsyncData(self, data) if data is not None else None
-        cdef uint64_t id_data = id(data)
+        cdef uint64_t id_data = <uint64_t>hash(data)
+        userdatas = self.reply_userdata.get(id_data, None)
+        if userdatas is None:
+            self.reply_userdata[id_data] = userdatas = _ReplyUserData(data)
+        userdatas.add()
         cdef const char* prop_c = prop
         with nogil:
             err = mpv_get_property_async(
@@ -583,8 +585,6 @@ cdef class Context(object):
                 prop_c,
                 MPV_FORMAT_NODE,
             )
-        if err < 0 and data:
-            data._remove()
         return err
 
     def try_get_property_async(self, prop, data=None, default=None):
@@ -643,8 +643,11 @@ cdef class Context(object):
                         &v
                     )
                 return err
-            data = _AsyncData(self, data) if data is not None else None
-            data_id = <uint64_t>id(data)
+            data_id = <uint64_t>hash(data)
+            userdatas = self.reply_userdata.get(data_id, None)
+            if userdatas is None:
+                self.reply_userdata[data_id] = userdatas = _ReplyUserData(data)
+            userdatas.add()
             with nogil:
                 err = mpv_set_property_async(
                     self._ctx,
@@ -655,8 +658,6 @@ cdef class Context(object):
                 )
         finally:
             self._free_native_value(v)
-        if err < 0 and data:
-            data._remove()
         return err
 
     @_errors
@@ -730,21 +731,22 @@ cdef class Context(object):
             raise MPVError("Context creation error")
         self.callbackthread = CallbackThread()
         _callbacks[ctxid] = self.callbackthread
-        self.async_data = _AsyncDataSet()
-        _async_data[ctxid] = self.async_data
+        self.reply_userdata = dict()
+        _reply_userdatas[ctxid] = self.reply_userdata
         self.callbackthread.start()
 
     def observe_property(self, prop, data=None):
         """Wraps: mpv_observe_property"""
         assert self._ctx
-        new = False
-        if data is not None and not isinstance(data, ObservedProperty):
-            new = True
-            data = ObservedProperty(self, data)
+        cdef uint64_t id_data = <uint64_t>hash(data)
+        id_data = <uint64_t>hash(data)
+        userdatas = self.reply_userdata.get(id_data, None)
+        if userdatas is None:
+            self.reply_userdata[id_data] = userdatas = _ReplyUserData(data)
+        userdatas.observed = True
         prop = _strenc(prop)
         cdef char* propc = prop
         cdef int err
-        cdef uint64_t id_data = <uint64_t>id(data)
         with nogil:
             err = mpv_observe_property(
                 self._ctx,
@@ -753,7 +755,6 @@ cdef class Context(object):
                 MPV_FORMAT_NODE,
             )
         if err < 0:
-            data._remove() if new else None
             raise MPVError(err)
         return data
 
@@ -761,8 +762,12 @@ cdef class Context(object):
     def unobserve_property(self, data):
         """Wraps: mpv_unobserve_property"""
         assert self._ctx
-        data._remove() if data else None
-        cdef uint64_t id_data = <uint64_t>id(data)
+        cdef uint64_t id_data = <uint64_t>hash(data)
+        userdatas = self.reply_userdata.get(id_data, None)
+        if userdatas is not None:
+            userdatas.observed = False
+            if userdatas.counter <= 0:
+                del self.reply_userdata[id_data]
         cdef int err
         with nogil:
             err = mpv_unobserve_property(
@@ -777,7 +782,9 @@ cdef class Context(object):
             mpv_terminate_destroy(self._ctx)
         self.callbackthread.shutdown()
         del _callbacks[ctxid]
-        del _async_data[ctxid]
+        del _reply_userdatas[ctxid]
+        self.callback = None
+        self.reply_userdata = None
         self._ctx = NULL
 
     def __dealloc__(self):
