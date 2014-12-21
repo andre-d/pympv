@@ -7,6 +7,7 @@ pympv
 - Sync up header with new errors from 1.11
 - Add shutdown() to cleanup a context, GCing the context calls this
 - Callbacks and data are no longer associated weakly
+- Async data and observe property system changed to be hash() based
 
 ## 0.2.1
 
