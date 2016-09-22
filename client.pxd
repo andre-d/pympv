@@ -75,26 +75,26 @@ cdef extern from "mpv/client.h":
         pass
 
     cdef enum mpv_error:
-        MPV_ERROR_SUCCESS = 0
-        MPV_ERROR_EVENT_QUEUE_FULL = -1
-        MPV_ERROR_NOMEM = -2
-        MPV_ERROR_UNINITIALIZED = -3
-        MPV_ERROR_INVALID_PARAMETER = -4
-        MPV_ERROR_OPTION_NOT_FOUND = -5
-        MPV_ERROR_OPTION_FORMAT = -6
-        MPV_ERROR_OPTION_ERROR = -7
-        MPV_ERROR_PROPERTY_NOT_FOUND = -8
-        MPV_ERROR_PROPERTY_FORMAT = -9
-        MPV_ERROR_PROPERTY_UNAVAILABLE = -10
-        MPV_ERROR_PROPERTY_ERROR = -11
-        MPV_ERROR_COMMAND = -12
-        MPV_ERROR_LOADING_FAILED = -13
-        MPV_ERROR_AO_INIT_FAILED = -14
-        MPV_ERROR_VO_INIT_FAILED = -15
-        MPV_ERROR_NOTHING_TO_PLAY = -16
-        MPV_ERROR_UNKNOWN_FORMAT = -17
-        MPV_ERROR_UNSUPPORTED = -18
-        MPV_ERROR_NOT_IMPLEMENTED = -19
+        MPV_ERROR_SUCCESS
+        MPV_ERROR_EVENT_QUEUE_FULL
+        MPV_ERROR_NOMEM
+        MPV_ERROR_UNINITIALIZED
+        MPV_ERROR_INVALID_PARAMETER
+        MPV_ERROR_OPTION_NOT_FOUND
+        MPV_ERROR_OPTION_FORMAT
+        MPV_ERROR_OPTION_ERROR
+        MPV_ERROR_PROPERTY_NOT_FOUND
+        MPV_ERROR_PROPERTY_FORMAT
+        MPV_ERROR_PROPERTY_UNAVAILABLE
+        MPV_ERROR_PROPERTY_ERROR
+        MPV_ERROR_COMMAND
+        MPV_ERROR_LOADING_FAILED
+        MPV_ERROR_AO_INIT_FAILED
+        MPV_ERROR_VO_INIT_FAILED
+        MPV_ERROR_NOTHING_TO_PLAY
+        MPV_ERROR_UNKNOWN_FORMAT
+        MPV_ERROR_UNSUPPORTED
+        MPV_ERROR_NOT_IMPLEMENTED
 
     const char *mpv_error_string(int error) nogil
 
@@ -186,7 +186,7 @@ cdef extern from "mpv/client.h":
 
     int mpv_unobserve_property(mpv_handle *mpv, uint64_t registered_reply_userdata) nogil
 
-    cdef enum mpv_event_id:
+    enum mpv_event_id:
         MPV_EVENT_NONE
         MPV_EVENT_SHUTDOWN
         MPV_EVENT_LOG_MESSAGE
@@ -219,15 +219,15 @@ cdef extern from "mpv/client.h":
         mpv_format format
         void *data
 
-    cdef enum mpv_log_level:
-        MPV_LOG_LEVEL_NONE  = 0
-        MPV_LOG_LEVEL_FATAL = 10
-        MPV_LOG_LEVEL_ERROR = 20
-        MPV_LOG_LEVEL_WARN  = 30
-        MPV_LOG_LEVEL_INFO  = 40
-        MPV_LOG_LEVEL_V     = 50
-        MPV_LOG_LEVEL_DEBUG = 60
-        MPV_LOG_LEVEL_TRACE = 70
+    enum mpv_log_level:
+        MPV_LOG_LEVEL_NONE
+        MPV_LOG_LEVEL_FATAL
+        MPV_LOG_LEVEL_ERROR
+        MPV_LOG_LEVEL_WARN
+        MPV_LOG_LEVEL_INFO
+        MPV_LOG_LEVEL_V
+        MPV_LOG_LEVEL_DEBUG
+        MPV_LOG_LEVEL_TRACE
 
     cdef struct mpv_event_log_message:
         const char *prefix
@@ -235,11 +235,11 @@ cdef extern from "mpv/client.h":
         const char *text
         int log_level
 
-    cdef enum mpv_end_file_reason:
-        MPV_END_FILE_REASON_EOF = 0
-        MPV_END_FILE_REASON_STOP = 2
-        MPV_END_FILE_REASON_QUIT = 3
-        MPV_END_FILE_REASON_ERROR = 4
+    enum mpv_end_file_reason:
+        MPV_END_FILE_REASON_EOF
+        MPV_END_FILE_REASON_STOP
+        MPV_END_FILE_REASON_QUIT
+        MPV_END_FILE_REASON_ERROR
 
     cdef struct mpv_event_end_file:
         int reason
