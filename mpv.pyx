@@ -327,8 +327,9 @@ class MPVError(Exception):
     def __init__(self, e):
         self.code = e
         cdef const char* err_c
-        cdef int e_i = e
-        if not isinstance(e, str):
+        cdef int e_i
+        if not isinstance(e, basestring):
+            e_i = e
             with nogil:
                 err_c = mpv_error_string(e_i)
             e = _strdec(err_c)
@@ -439,7 +440,7 @@ cdef class Context(object):
         return err
 
     def _format_for(self, value):
-        if isinstance(value, str):
+        if isinstance(value, basestring):
             return MPV_FORMAT_STRING
         elif isinstance(value, bool):
             return MPV_FORMAT_FLAG
