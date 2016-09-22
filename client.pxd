@@ -271,4 +271,31 @@ cdef extern from "mpv/client.h":
 
     int mpv_get_wakeup_pipe(mpv_handle *ctx) nogil
 
+    void mpv_wait_async_requests(mpv_handle *ctx) nogil
 
+    enum mpv_sub_api:
+        MPV_SUB_API_OPENGL_CB
+
+    void *mpv_get_sub_api(mpv_handle *ctx, mpv_sub_api sub_api) nogil
+
+cdef extern from "mpv/opengl_cb.h":
+    struct mpv_opengl_cb_context:
+        pass
+
+    ctypedef void (*mpv_opengl_cb_update_fn)(void *cb_ctx)
+    ctypedef void *(*mpv_opengl_cb_get_proc_address_fn)(void *fn_ctx,
+                                                        const char *name) nogil
+
+    void mpv_opengl_cb_set_update_callback(mpv_opengl_cb_context *ctx,
+                                           mpv_opengl_cb_update_fn callback,
+                                           void *callback_ctx) nogil
+
+    int mpv_opengl_cb_init_gl(mpv_opengl_cb_context *ctx, const char *exts,
+                              mpv_opengl_cb_get_proc_address_fn get_proc_address,
+                              void *get_proc_address_ctx) nogil
+
+    int mpv_opengl_cb_draw(mpv_opengl_cb_context *ctx, int fbo, int w, int h) nogil
+
+    int mpv_opengl_cb_report_flip(mpv_opengl_cb_context *ctx, int64_t time) nogil
+
+    int mpv_opengl_cb_uninit_gl(mpv_opengl_cb_context *ctx) nogil

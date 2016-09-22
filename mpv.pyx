@@ -787,8 +787,82 @@ cdef class Context(object):
         self.reply_userdata = None
         self._ctx = NULL
 
+    def opengl_cb_api(self):
+        cdef void *cb
+
+        _ctx = mpv_get_sub_api(self._ctx, MPV_SUB_API_OPENGL_CB)
+        if not _ctx:
+            raise MPVError("OpenGL API not available")
+
+        ctx = OpenGLContext()
+        ctx._ctx = <mpv_opengl_cb_context*>_ctx
+
+        return ctx
+
     def __dealloc__(self):
         self.shutdown()
+
+cdef void *_c_getprocaddress(void *ctx, const char *name) with gil:
+    return <void *><intptr_t>(<object>ctx)(name)
+
+cdef void _c_updatecb(void *ctx) with gil:
+    (<object>ctx)()
+
+cdef class OpenGLContext(object):
+    cdef:
+        mpv_opengl_cb_context *_ctx
+        bint inited
+        object update_cb
+
+    def __init__(self):
+        self.inited = False
+
+    def init_gl(self, exts, get_proc_address):
+        exts = _strenc(exts) if exts is not None else None
+        cdef char* extsc = NULL
+        if exts is not None:
+            extsc = exts
+        with nogil:
+            err = mpv_opengl_cb_init_gl(self._ctx, extsc, &_c_getprocaddress,
+                                        <void *>get_proc_address)
+        if err < 0:
+            raise MPVError(err)
+
+        self.inited = True
+
+    def set_update_callback(self, cb):
+        self.update_cb = cb
+        with nogil:
+            mpv_opengl_cb_set_update_callback(self._ctx, &_c_updatecb, <void *>cb)
+
+    def draw(self, fbo, w, h):
+        cdef:
+            int fboc = fbo
+            int wc = w
+            int hc = h
+        with nogil:
+            err = mpv_opengl_cb_draw(self._ctx, fboc, wc, hc)
+        if err < 0:
+            raise MPVError(err)
+
+    def report_flip(self, time):
+        cdef int64_t ctime = time
+        with nogil:
+            err = mpv_opengl_cb_report_flip(self._ctx, ctime)
+        if err < 0:
+            raise MPVError(err)
+
+    def uninit_gl(self):
+        if not self.inited:
+            return
+        with nogil:
+            err = mpv_opengl_cb_uninit_gl(self._ctx)
+        if err < 0:
+            raise MPVError(err)
+        self.inited = False
+
+    def __dealloc__(self):
+        self.uninit_gl()
 
 class CallbackThread(Thread):
     def __init__(self):
