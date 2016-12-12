@@ -13,6 +13,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import os
 from setuptools import setup, find_packages
 from setuptools.extension import Extension
 
@@ -29,9 +30,28 @@ extensions=[
 if USE_CYTHON:
     extensions=cythonize(extensions)
 
+def read(fname):
+    return open(os.path.join(os.path.dirname(__file__), fname)).read()
 
 setup(
         name='pympv',
         version='0.4.0',
-        ext_modules=extensions,
+        description='Python bindings for the libmpv library',
+        # This is supposed to be reST. Cheating by using a common subset of
+        # reST and Markdown...
+        long_description=read('README.md'),
+        author='Andre D',
+        author_email='andre@andred.ca',
+        maintainer='Hector Martin',
+        maintainer_email='marcan@marcan.st',
+        url='https://github.com/marcan/pympv',
+        classifiers=[
+            'Development Status :: 3 - Alpha',
+            'Programming Language :: Cython',
+            'Topic :: Multimedia :: Sound/Audio :: Players',
+            'Topic :: Multimedia :: Video',
+            'Topic :: Software Development :: Libraries',
+            'License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)'
+        ],
+        ext_modules=extensions
 )

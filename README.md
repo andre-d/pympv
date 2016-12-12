@@ -2,7 +2,7 @@ pympv
 =====
 A python wrapper for libmpv.
 
-To use
+To use::
 
     import sys
     import mpv
