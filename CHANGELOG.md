@@ -1,6 +1,10 @@
 pympv
 =====
 
+## 0.4.1
+
+- Prepare packaging for PyPI
+
 ## 0.4.0
 - Fix string support in Python2
 - Add opengl-cb support
