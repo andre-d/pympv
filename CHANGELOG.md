@@ -1,6 +1,11 @@
 pympv
 =====
 
+## 0.4.0
+- Fix string support in Python2
+- Add opengl-cb support
+- Improve packaging/setup.py
+
 ## 0.3.0
 
 - Fix various failures of data and callbacks
