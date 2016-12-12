@@ -32,6 +32,6 @@ if USE_CYTHON:
 
 setup(
         name='pympv',
-        version='0.3.0',
+        version='0.4.0',
         ext_modules=extensions,
 )
