@@ -43,3 +43,6 @@ To use::
 libmpv is a client library for the media player mpv
 
 For more info see: https://github.com/mpv-player/mpv/blob/master/libmpv/client.h
+
+pympv was originally written by Andre D, and the PyPI package is maintained
+by Hector Martin.
