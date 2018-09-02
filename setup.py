@@ -35,7 +35,7 @@ def read(fname):
 
 setup(
         name='pympv',
-        version='0.5.0',
+        version='0.5.1',
         description='Python bindings for the libmpv library',
         # This is supposed to be reST. Cheating by using a common subset of
         # reST and Markdown...
