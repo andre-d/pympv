@@ -28,7 +28,7 @@ extensions=[
     Extension('mpv', ['mpv.%s' % ext], libraries=['mpv']),
 ]
 if USE_CYTHON:
-    extensions=cythonize(extensions)
+    extensions=cythonize(extensions, force=True)
 
 def read(fname):
     return open(os.path.join(os.path.dirname(__file__), fname)).read()
