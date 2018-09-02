@@ -518,7 +518,7 @@ cdef class Context(object):
         elif node.format == MPV_FORMAT_STRING:
             free(node.u.string)
 
-    def command(self, *cmdlist, async=False, data=None):
+    def command(self, *cmdlist, asynchronous=False, data=None):
         """Send a command to mpv.
 
         Non-async success returns the command's response data, otherwise None
@@ -527,7 +527,7 @@ cdef class Context(object):
         Accepts parameters as args
 
         Keyword Arguments:
-        async: True will return right away, status comes in as MPV_EVENT_COMMAND_REPLY
+        asynchronous: True will return right away, status comes in as MPV_EVENT_COMMAND_REPLY
         data: Only valid if async, gets sent back as reply_userdata in the Event
 
         Wraps: mpv_command_node and mpv_command_node_async
@@ -540,7 +540,7 @@ cdef class Context(object):
         result = None
         try:
             data_id = id(data)
-            if not async:
+            if not asynchronous:
                 with nogil:
                     err = mpv_command_node(self._ctx, &node, &noderesult)
                 try:
@@ -624,7 +624,7 @@ cdef class Context(object):
         return v
 
     @_errors
-    def set_property(self, prop, value=True, async=False, data=None):
+    def set_property(self, prop, value=True, asynchronous=False, data=None):
         """Wraps: mpv_set_property and mpv_set_property_async"""
         assert self._ctx
         prop = _strenc(prop)
@@ -635,7 +635,7 @@ cdef class Context(object):
         cdef const char* prop_c
         try:
             prop_c = prop
-            if not async:
+            if not asynchronous:
                 with nogil:
                     err = mpv_set_property(
                         self._ctx,
