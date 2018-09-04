@@ -152,6 +152,10 @@ cdef extern from "mpv/client.h":
         mpv_node *values
         char **keys
 
+    cdef struct mpv_byte_array:
+        void *data
+        size_t size
+
     void mpv_free_node_contents(mpv_node *node) nogil
 
     int mpv_set_option(mpv_handle *ctx, const char *name, mpv_format format, void *data) nogil
@@ -282,7 +286,7 @@ cdef extern from "mpv/opengl_cb.h":
     struct mpv_opengl_cb_context:
         pass
 
-    ctypedef void (*mpv_opengl_cb_update_fn)(void *cb_ctx)
+    ctypedef void (*mpv_opengl_cb_update_fn)(void *cb_ctx) nogil
     ctypedef void *(*mpv_opengl_cb_get_proc_address_fn)(void *fn_ctx,
                                                         const char *name) nogil
 
@@ -299,3 +303,94 @@ cdef extern from "mpv/opengl_cb.h":
     int mpv_opengl_cb_report_flip(mpv_opengl_cb_context *ctx, int64_t time) nogil
 
     int mpv_opengl_cb_uninit_gl(mpv_opengl_cb_context *ctx) nogil
+
+
+cdef extern from "mpv/render.h":
+    struct mpv_render_context:
+        pass
+
+    enum mpv_render_param_type:
+        MPV_RENDER_PARAM_INVALID
+        MPV_RENDER_PARAM_API_TYPE
+        MPV_RENDER_PARAM_OPENGL_INIT_PARAMS
+        MPV_RENDER_PARAM_OPENGL_FBO
+        MPV_RENDER_PARAM_FLIP_Y
+        MPV_RENDER_PARAM_DEPTH
+        MPV_RENDER_PARAM_ICC_PROFILE
+        MPV_RENDER_PARAM_AMBIENT_LIGHT
+        MPV_RENDER_PARAM_X11_DISPLAY
+        MPV_RENDER_PARAM_WL_DISPLAY
+        MPV_RENDER_PARAM_ADVANCED_CONTROL
+        MPV_RENDER_PARAM_NEXT_FRAME_INFO
+        MPV_RENDER_PARAM_BLOCK_FOR_TARGET_TIME
+        MPV_RENDER_PARAM_SKIP_RENDERING
+        MPV_RENDER_PARAM_DRM_DISPLAY
+        MPV_RENDER_PARAM_DRM_OSD_SIZE
+
+    char *MPV_RENDER_API_TYPE_OPENGL
+
+    enum mpv_render_frame_info_flag:
+        MPV_RENDER_FRAME_INFO_PRESENT
+        MPV_RENDER_FRAME_INFO_REDRAW
+        MPV_RENDER_FRAME_INFO_REPEAT
+        MPV_RENDER_FRAME_INFO_BLOCK_VSYNC
+
+    struct mpv_render_param:
+        mpv_render_param_type type
+        void *data
+
+    struct mpv_render_frame_info:
+        uint64_t flags
+        int64_t target_time
+
+    int mpv_render_context_create(mpv_render_context **res, mpv_handle *mpv,
+                                  mpv_render_param *params) nogil
+
+    int mpv_render_context_set_parameter(mpv_render_context *ctx,
+                                     mpv_render_param param) nogil
+
+    int mpv_render_context_get_info(mpv_render_context *ctx,
+                                    mpv_render_param param) nogil
+
+    ctypedef void (*mpv_render_update_fn)(void *cb_ctx) nogil
+
+    void mpv_render_context_set_update_callback(mpv_render_context *ctx,
+                                                mpv_render_update_fn callback,
+                                                void *callback_ctx) nogil
+
+    uint64_t mpv_render_context_update(mpv_render_context *ctx) nogil
+
+    enum mpv_render_update_flag:
+        MPV_RENDER_UPDATE_FRAME
+
+    int mpv_render_context_render(mpv_render_context *ctx, mpv_render_param *params) nogil
+
+    void mpv_render_context_report_swap(mpv_render_context *ctx) nogil
+
+    void mpv_render_context_free(mpv_render_context *ctx) nogil
+
+cdef extern from "mpv/render_gl.h":
+    struct mpv_opengl_init_params:
+        void *(*get_proc_address)(void *ctx, const char *name)
+        void *get_proc_address_ctx
+        const char *extra_exts
+
+    struct mpv_opengl_fbo:
+        int fbo
+        int w
+        int h
+        int internal_format
+
+    struct _drmModeAtomicReq:
+        pass
+
+    struct mpv_opengl_drm_params:
+        int fd
+        int crtc_id
+        int connector_id
+        _drmModeAtomicReq **atomic_request_ptr
+        int render_fd
+
+    struct mpv_opengl_drm_osd_size:
+        int width
+        int height

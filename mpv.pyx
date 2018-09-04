@@ -18,10 +18,12 @@ libmpv is a client library for the media player mpv
 For more info see: https://github.com/mpv-player/mpv/blob/master/libmpv/client.h
 """
 
-import sys
+import cython
+import sys, warnings
 from threading import Thread, Semaphore
 from libc.stdlib cimport malloc, free
-from libc.string cimport strcpy
+from libc.string cimport strcpy, strlen, memset
+from cpython.pycapsule cimport PyCapsule_IsValid, PyCapsule_GetPointer
 
 from client cimport *
 
@@ -334,6 +336,9 @@ class MPVError(Exception):
                 err_c = mpv_error_string(e_i)
             e = _strdec(err_c)
         Exception.__init__(self, e)
+
+class PyMPVError(Exception):
+    pass
 
 cdef _callbacks = dict()
 cdef _reply_userdatas = dict()
@@ -777,6 +782,8 @@ cdef class Context(object):
         return err
 
     def shutdown(self):
+        if self._ctx == NULL:
+            return
         cdef uint64_t ctxid = <uint64_t>id(self)
         with nogil:
             mpv_terminate_destroy(self._ctx)
@@ -816,6 +823,7 @@ cdef class OpenGLContext(object):
 
     def __init__(self):
         self.inited = False
+        warnings.warn("OpenGLContext is deprecated, please switch to RenderContext", DeprecationWarning)
 
     def init_gl(self, exts, get_proc_address):
         exts = _strenc(exts) if exts is not None else None
@@ -863,6 +871,252 @@ cdef class OpenGLContext(object):
 
     def __dealloc__(self):
         self.uninit_gl()
+
+DEF MAX_RENDER_PARAMS = 32
+
+cdef class _RenderParams(object):
+    cdef:
+        mpv_render_param params[MAX_RENDER_PARAMS + 1]
+        object owned
+
+    def __init__(self):
+        self.owned = []
+        self.params[0].type = MPV_RENDER_PARAM_INVALID
+
+    cdef add_voidp(self, mpv_render_param_type t, void *p, bint owned=False):
+        count = len(self.owned)
+        if count >= MAX_RENDER_PARAMS:
+            if owned:
+                free(p)
+            raise PyMPVError("RenderParams overflow")
+
+        self.params[count].type = t
+        self.params[count].data = p
+        self.params[count + 1].type = MPV_RENDER_PARAM_INVALID
+        self.owned.append(owned)
+
+    cdef add_int(self, mpv_render_param_type t, int val):
+        cdef int *p = <int *>malloc(sizeof(int))
+        p[0] = val
+        self.add_voidp(t, p)
+
+    cdef add_string(self, mpv_render_param_type t, char *s):
+        cdef char *p = <char *>malloc(strlen(s) + 1)
+        strcpy(p, s)
+        self.add_voidp(t, p)
+
+    def __dealloc__(self):
+        for i, j in enumerate(self.owned):
+            if j:
+                free(self.params[i].data)
+
+cdef void *get_pointer(const char *name, object obj):
+    cdef void *p
+    if PyCapsule_IsValid(obj, name):
+        p = PyCapsule_GetPointer(obj, name)
+    elif isinstance(obj, int) or isinstance(obj, long) and obj:
+        p = <void *><intptr_t>obj
+    else:
+        raise PyMPVError("Unknown or invalid pointer object: %r" % obj)
+    return p
+
+@cython.internal
+cdef class RenderFrameInfo(object):
+    cdef _from_struct(self, mpv_render_frame_info *info):
+        self.present = bool(info[0].flags & MPV_RENDER_FRAME_INFO_PRESENT)
+        self.redraw = bool(info[0].flags & MPV_RENDER_FRAME_INFO_REDRAW)
+        self.repeat = bool(info[0].flags & MPV_RENDER_FRAME_INFO_REPEAT)
+        self.block_vsync = bool(info[0].flags & MPV_RENDER_FRAME_INFO_BLOCK_VSYNC)
+        self.target_time = info[0].target_time
+        return self
+
+cdef class RenderContext(object):
+    API_OPENGL = "opengl"
+    UPDATE_FRAME = MPV_RENDER_UPDATE_FRAME
+
+    cdef:
+        Context _mpv
+        mpv_render_context *_ctx
+        object update_cb
+        object _x11_display
+        object _wl_display
+        object _get_proc_address
+        bint inited
+
+    def __init__(self, mpv,
+                 api_type,
+                 opengl_init_params=None,
+                 advanced_control=False,
+                 x11_display=None,
+                 wl_display=None,
+                 drm_display=None,
+                 drm_osd_size=None
+                 ):
+
+        cdef:
+            mpv_opengl_init_params gl_params
+            mpv_opengl_drm_params drm_params
+            mpv_opengl_drm_osd_size _drm_osd_size
+
+        self._mpv = mpv
+
+        memset(&gl_params, 0, sizeof(gl_params))
+        memset(&drm_params, 0, sizeof(drm_params))
+        memset(&_drm_osd_size, 0, sizeof(_drm_osd_size))
+
+        params = _RenderParams()
+
+        if api_type == self.API_OPENGL:
+            params.add_string(MPV_RENDER_PARAM_API_TYPE, MPV_RENDER_API_TYPE_OPENGL)
+        else:
+            raise PyMPVError("Unknown api_type %r" % api_type)
+
+        if opengl_init_params is not None:
+            self._get_proc_address = opengl_init_params["get_proc_address"]
+            gl_params.get_proc_address = &_c_getprocaddress
+            gl_params.get_proc_address_ctx = <void *>self._get_proc_address
+            params.add_voidp(MPV_RENDER_PARAM_OPENGL_INIT_PARAMS, &gl_params)
+        if advanced_control:
+            params.add_int(MPV_RENDER_PARAM_ADVANCED_CONTROL, 1)
+        if x11_display:
+            self._x11_display = x11_display
+            params.add_voidp(MPV_RENDER_PARAM_X11_DISPLAY, get_pointer("Display", x11_display))
+        if wl_display:
+            self._wl_display = wl_display
+            params.add_voidp(MPV_RENDER_PARAM_WL_DISPLAY, get_pointer("wl_display", wl_display))
+        if drm_display:
+            drm_params.fd = drm_display.get("fd", -1)
+            drm_params.crtc_id = drm_display.get("crtc_id", -1)
+            drm_params.connector_id = drm_display.get("connector_id", -1)
+            arp = drm_display.get("atomic_request_ptr", None)
+            if arp is not None:
+                drm_params.atomic_request_ptr = <_drmModeAtomicReq **>get_pointer(arp, "drmModeAtomicReq*")
+            drm_params.render_fd = drm_display.get("render_fd", -1)
+            params.add_voidp(MPV_RENDER_PARAM_DRM_DISPLAY, &drm_params)
+        if drm_osd_size:
+            _drm_osd_size.width, _drm_osd_size.height = drm_osd_size
+            params.add_voidp(MPV_RENDER_PARAM_DRM_OSD_SIZE, &_drm_osd_size)
+
+        err = mpv_render_context_create(&self._ctx, self._mpv._ctx, params.params)
+        if err < 0:
+            raise MPVError(err)
+        self.inited = True
+
+    @_errors
+    def set_icc_profile(self, icc_blob):
+        cdef:
+            mpv_render_param param
+            mpv_byte_array val
+            int err
+
+        if not isinstance(icc_blob, bytes):
+            raise PyMPVError("icc_blob should be a bytes instance")
+        val.data = <void *><char *>icc_blob
+        val.size = len(icc_blob)
+
+        param.type = MPV_RENDER_PARAM_ICC_PROFILE
+        param.data = &val
+
+        with nogil:
+            err = mpv_render_context_set_parameter(self._ctx, param)
+        return err
+
+    @_errors
+    def set_ambient_light(self, lux):
+        cdef:
+            mpv_render_param param
+            int val
+            int err
+
+        val = lux
+        param.type = MPV_RENDER_PARAM_AMBIENT_LIGHT
+        param.data = &val
+
+        with nogil:
+            err = mpv_render_context_set_parameter(self._ctx, param)
+        return err
+
+    def get_next_frame_info(self):
+        cdef:
+            mpv_render_frame_info info
+            mpv_render_param param
+
+        param.type = MPV_RENDER_PARAM_NEXT_FRAME_INFO
+        param.data = &info
+        with nogil:
+            err = mpv_render_context_get_info(self._ctx, param)
+        if err < 0:
+            raise MPVError(err)
+
+        return RenderFrameInfo()._from_struct(&info)
+
+    def set_update_callback(self, cb):
+        with nogil:
+            mpv_render_context_set_update_callback(self._ctx, &_c_updatecb, <void *>cb)
+        self.update_cb = cb
+
+    def update(self):
+        cdef uint64_t ret
+        with nogil:
+            ret = mpv_render_context_update(self._ctx)
+        return ret
+
+    @_errors
+    def render(self,
+               opengl_fbo=None,
+               flip_y=False,
+               depth=None,
+               block_for_target_time=True,
+               skip_rendering=False):
+
+        cdef:
+            mpv_opengl_fbo fbo
+
+        params = _RenderParams()
+
+        if opengl_fbo:
+            memset(&fbo, 0, sizeof(fbo))
+            fbo.fbo = opengl_fbo.get("fbo", 0) or 0
+            fbo.w = opengl_fbo["w"]
+            fbo.h = opengl_fbo["h"]
+            fbo.internal_format = opengl_fbo.get("internal_format", 0) or 0
+            params.add_voidp(MPV_RENDER_PARAM_OPENGL_FBO, &fbo)
+        if flip_y:
+            params.add_int(MPV_RENDER_PARAM_FLIP_Y, 1)
+        if depth is not None:
+            params.add_int(MPV_RENDER_PARAM_DEPTH, depth)
+        if not block_for_target_time:
+            params.add_int(MPV_RENDER_PARAM_BLOCK_FOR_TARGET_TIME, 0)
+        if skip_rendering:
+            params.add_int(MPV_RENDER_PARAM_SKIP_RENDERING, 1)
+
+        with nogil:
+            ret = mpv_render_context_render(self._ctx, params.params)
+        return ret
+
+    def report_swap(self):
+        with nogil:
+            mpv_render_context_report_swap(self._ctx)
+
+    def close(self):
+        if not self.inited:
+            return
+        with nogil:
+            mpv_render_context_free(self._ctx)
+        self.inited = False
+
+    def __dealloc__(self):
+        self.close()
+
+cdef class OpenGLRenderContext(RenderContext):
+    def __init__(self, mpv,
+                 get_proc_address,
+                 *args, **kwargs):
+        init_params = {
+            "get_proc_address": get_proc_address
+        }
+        RenderContext.__init__(self, mpv, RenderContext.API_OPENGL,
+                               init_params, *args, **kwargs)
 
 class CallbackThread(Thread):
     def __init__(self):
