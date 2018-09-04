@@ -1,6 +1,14 @@
 pympv
 =====
 
+## 0.6.0
+- Add support for the render API
+- Deprecate the legacy opengl-cb API
+
+## 0.5.1
+- Rename async -> asynchronous for Python 3.7 compatibility
+- Force Cython rebuilds if Cython is installed
+
 ## 0.4.1
 
 - Prepare packaging for PyPI
