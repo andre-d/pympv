@@ -1,0 +1,98 @@
+name: deploy
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+
+  create-windows-wheel:
+
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+
+    - name: Download libmpv
+      run: |
+        $VERSION = "libmpv/mpv-dev-x86_64-20200524-git-685bd6a.7z"
+        $URL = "https://sourceforge.net/projects/mpv-player-windows/files"
+        curl -L -o libmpv.7z "$URL/$VERSION"
+        7z x libmpv.7z
+
+    - name: Set VS environment variables
+      run: |
+        $VsPath = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer"
+        echo "::add-path::$VsPath"
+
+    - name: Set MSVC x86_64 linker path
+      run: |
+        $LinkGlob = "VC\Tools\MSVC\*\bin\Hostx64\x64"
+        $LinkPath = vswhere -latest -products * -find "$LinkGlob" |
+                    Select-Object -Last 1
+        echo "::add-path::$LinkPath"
+
+    - name: Create the libmpv zip
+      shell: cmd
+      run: |
+        lib /def:mpv.def /machine:x64 /out:mpv.lib
+        ren mpv-1.dll mpv.dll
+        ren include mpv
+        7z a libmpv.zip mpv/ mpv.dll mpv.lib
+
+    - name: Install Python 3.7 version
+      uses: actions/setup-python@v1
+      with:
+        python-version: '3.7'
+        architecture: 'x64'
+
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install setuptools wheel
+        pip install --upgrade cython
+
+    - name: Create Python wheel
+      run: |
+        python setup.py bdist_wheel --plat-name win_amd64 --python-tag cp37
+
+    - name: Upload Windows wheel
+      uses: actions/upload-artifact@v2
+      with:
+        name: dist
+        path: dist
+
+  deploy-binaries:
+
+    needs: create-windows-wheel
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+
+    - name: Download Windows wheel
+      uses: actions/download-artifact@v2
+
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install setuptools twine
+        pip install --upgrade cython
+
+    - name: Release source code
+      run: |
+        python setup.py sdist
+
+    - name: Twine check
+      run: |
+        python -m twine check dist/*
+
+    - name: Publish distribution to PyPI
+      uses: pypa/gh-action-pypi-publish@master
+      with:
+        user: __token__
+        password: ${{ secrets.pypi_token }}
