@@ -27,14 +27,14 @@ jobs:
     - name: Set VS environment variables
       run: |
         $VsPath = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer"
-        echo "::add-path::$VsPath"
+        echo "$VsPath" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
     - name: Set MSVC x86_64 linker path
       run: |
         $LinkGlob = "VC\Tools\MSVC\*\bin\Hostx64\x64"
         $LinkPath = vswhere -latest -products * -find "$LinkGlob" |
                     Select-Object -Last 1
-        echo "::add-path::$LinkPath"
+        echo "$LinkPath" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
     - name: Create the libmpv zip
       shell: cmd
