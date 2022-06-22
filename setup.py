@@ -20,13 +20,16 @@ from os.path import join
 
 from setuptools import Extension, find_packages, setup
 
-try:
-    from Cython.Build import cythonize
-    USE_CYTHON = True
-    extension_src = "mpv.pyx"
-except ImportError:
-    USE_CYTHON = False
-    extension_src = "mpv.c"
+USE_CYTHON = False
+extension_src = "mpv.c"
+
+if os.path.exists("mpv.pyx"):
+    try:
+        from Cython.Build import cythonize
+        USE_CYTHON = True
+        extension_src = "mpv.pyx"
+    except ImportError:
+        pass
 
 extra_data = {}
 extensions = [Extension("mpv", [extension_src], libraries=["mpv"])]
