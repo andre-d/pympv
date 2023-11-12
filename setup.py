@@ -14,35 +14,74 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import os
-from subprocess import call
-from distutils.core import setup
-from distutils.extension import Extension
-from distutils.command.clean import clean
-from Cython.Distutils import build_ext
-from Cython.Build import cythonize
+import sys
+from glob import glob
+from os.path import join
 
-def tryremove(filename):
-    if not os.path.isfile(filename):
-        return
+from setuptools import Extension, find_packages, setup
+
+USE_CYTHON = False
+extension_src = "mpv.c"
+
+if os.path.exists("mpv.pyx"):
     try:
-        os.remove(filename)
-    except OSError as e:
-        print(e)
+        from Cython.Build import cythonize
+        USE_CYTHON = True
+        extension_src = "mpv.pyx"
+    except ImportError:
+        pass
 
-class Clean(clean):
-    side_effects = [
-        "mpv.c",
+extra_data = {}
+extensions = [Extension("mpv", [extension_src], libraries=["mpv"])]
+
+if set(["setup.py", "--version", "-V"]) >= set(sys.argv):
+    extensions = []
+
+if set(["bdist_wheel", "--plat-name", "win_amd64"]) <= set(sys.argv):
+    extra_data["data_files"] = [
+        ("Scripts", ["mpv.dll"]),
+        ("libs", ["mpv.lib"]),
+        ("include", glob("mpv/*")),
+    ]
+    extensions = [
+        Extension(
+            "mpv",
+            [extension_src],
+            libraries=["mpv"],
+            library_dirs=[os.curdir],
+            include_dirs=[join(os.curdir, "mpv")],
+        )
     ]
 
-    def run(self):
-        for f in self.side_effects:
-            tryremove(f)
-        clean.run(self)
+if USE_CYTHON:
+    extensions = cythonize(extensions, force=True)
+
+
+def read(fname):
+    return open(os.path.join(os.path.dirname(__file__), fname)).read()
+
 
 setup(
-    cmdclass = {
-        "build_ext": build_ext,
-        "clean": Clean,
-    },
-    ext_modules = cythonize([Extension("mpv", ["mpv.pyx"], libraries=['mpv'])])
+    name="pympv",
+    version="0.8.0",
+    description="Python bindings for the libmpv library",
+    # This is supposed to be reST. Cheating by using a common subset of
+    # reST and Markdown...
+    long_description=read("README.md"),
+    long_description_content_type="text/markdown",
+    author="Andre D",
+    author_email="andre@andred.ca",
+    maintainer="Hector Martin",
+    maintainer_email="marcan@marcan.st",
+    url="https://github.com/marcan/pympv",
+    classifiers=[
+        "Development Status :: 3 - Alpha",
+        "Programming Language :: Cython",
+        "Topic :: Multimedia :: Sound/Audio :: Players",
+        "Topic :: Multimedia :: Video",
+        "Topic :: Software Development :: Libraries",
+        "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+    ],
+    ext_modules=extensions,
+    **extra_data
 )

@@ -75,26 +75,26 @@ cdef extern from "mpv/client.h":
         pass
 
     cdef enum mpv_error:
-        MPV_ERROR_SUCCESS = 0
-        MPV_ERROR_EVENT_QUEUE_FULL = -1
-        MPV_ERROR_NOMEM = -2
-        MPV_ERROR_UNINITIALIZED = -3
-        MPV_ERROR_INVALID_PARAMETER = -4
-        MPV_ERROR_OPTION_NOT_FOUND = -5
-        MPV_ERROR_OPTION_FORMAT = -6
-        MPV_ERROR_OPTION_ERROR = -7
-        MPV_ERROR_PROPERTY_NOT_FOUND = -8
-        MPV_ERROR_PROPERTY_FORMAT = -9
-        MPV_ERROR_PROPERTY_UNAVAILABLE = -10
-        MPV_ERROR_PROPERTY_ERROR = -11
-        MPV_ERROR_COMMAND = -12
-        MPV_ERROR_LOADING_FAILED = -13
-        MPV_ERROR_AO_INIT_FAILED = -14
-        MPV_ERROR_VO_INIT_FAILED = -15
-        MPV_ERROR_NOTHING_TO_PLAY = -16
-        MPV_ERROR_UNKNOWN_FORMAT = -17
-        MPV_ERROR_UNSUPPORTED = -18
-        MPV_ERROR_NOT_IMPLEMENTED = -19
+        MPV_ERROR_SUCCESS
+        MPV_ERROR_EVENT_QUEUE_FULL
+        MPV_ERROR_NOMEM
+        MPV_ERROR_UNINITIALIZED
+        MPV_ERROR_INVALID_PARAMETER
+        MPV_ERROR_OPTION_NOT_FOUND
+        MPV_ERROR_OPTION_FORMAT
+        MPV_ERROR_OPTION_ERROR
+        MPV_ERROR_PROPERTY_NOT_FOUND
+        MPV_ERROR_PROPERTY_FORMAT
+        MPV_ERROR_PROPERTY_UNAVAILABLE
+        MPV_ERROR_PROPERTY_ERROR
+        MPV_ERROR_COMMAND
+        MPV_ERROR_LOADING_FAILED
+        MPV_ERROR_AO_INIT_FAILED
+        MPV_ERROR_VO_INIT_FAILED
+        MPV_ERROR_NOTHING_TO_PLAY
+        MPV_ERROR_UNKNOWN_FORMAT
+        MPV_ERROR_UNSUPPORTED
+        MPV_ERROR_NOT_IMPLEMENTED
 
     const char *mpv_error_string(int error) nogil
 
@@ -106,15 +106,9 @@ cdef extern from "mpv/client.h":
 
     int mpv_initialize(mpv_handle *ctx) nogil
 
-    void mpv_detach_destroy(mpv_handle *ctx) nogil
-
     void mpv_terminate_destroy(mpv_handle *ctx) nogil
 
     int mpv_load_config_file(mpv_handle *ctx, const char *filename) nogil
-
-    void mpv_suspend(mpv_handle *ctx) nogil
-
-    void mpv_resume(mpv_handle *ctx) nogil
 
     int64_t mpv_get_time_us(mpv_handle *ctx) nogil
 
@@ -152,6 +146,10 @@ cdef extern from "mpv/client.h":
         mpv_node *values
         char **keys
 
+    cdef struct mpv_byte_array:
+        void *data
+        size_t size
+
     void mpv_free_node_contents(mpv_node *node) nogil
 
     int mpv_set_option(mpv_handle *ctx, const char *name, mpv_format format, void *data) nogil
@@ -186,7 +184,7 @@ cdef extern from "mpv/client.h":
 
     int mpv_unobserve_property(mpv_handle *mpv, uint64_t registered_reply_userdata) nogil
 
-    cdef enum mpv_event_id:
+    enum mpv_event_id:
         MPV_EVENT_NONE
         MPV_EVENT_SHUTDOWN
         MPV_EVENT_LOG_MESSAGE
@@ -196,21 +194,14 @@ cdef extern from "mpv/client.h":
         MPV_EVENT_START_FILE
         MPV_EVENT_END_FILE
         MPV_EVENT_FILE_LOADED
-        MPV_EVENT_TRACKS_CHANGED
-        MPV_EVENT_TRACK_SWITCHED
         MPV_EVENT_IDLE
-        MPV_EVENT_PAUSE
-        MPV_EVENT_UNPAUSE
         MPV_EVENT_TICK
-        MPV_EVENT_SCRIPT_INPUT_DISPATCH
         MPV_EVENT_CLIENT_MESSAGE
         MPV_EVENT_VIDEO_RECONFIG
         MPV_EVENT_AUDIO_RECONFIG
-        MPV_EVENT_METADATA_UPDATE
         MPV_EVENT_SEEK
         MPV_EVENT_PLAYBACK_RESTART
         MPV_EVENT_PROPERTY_CHANGE
-        MPV_EVENT_CHAPTER_CHANGE
 
     const char *mpv_event_name(mpv_event_id event) nogil
 
@@ -219,15 +210,15 @@ cdef extern from "mpv/client.h":
         mpv_format format
         void *data
 
-    cdef enum mpv_log_level:
-        MPV_LOG_LEVEL_NONE  = 0
-        MPV_LOG_LEVEL_FATAL = 10
-        MPV_LOG_LEVEL_ERROR = 20
-        MPV_LOG_LEVEL_WARN  = 30
-        MPV_LOG_LEVEL_INFO  = 40
-        MPV_LOG_LEVEL_V     = 50
-        MPV_LOG_LEVEL_DEBUG = 60
-        MPV_LOG_LEVEL_TRACE = 70
+    enum mpv_log_level:
+        MPV_LOG_LEVEL_NONE
+        MPV_LOG_LEVEL_FATAL
+        MPV_LOG_LEVEL_ERROR
+        MPV_LOG_LEVEL_WARN
+        MPV_LOG_LEVEL_INFO
+        MPV_LOG_LEVEL_V
+        MPV_LOG_LEVEL_DEBUG
+        MPV_LOG_LEVEL_TRACE
 
     cdef struct mpv_event_log_message:
         const char *prefix
@@ -235,11 +226,11 @@ cdef extern from "mpv/client.h":
         const char *text
         int log_level
 
-    cdef enum mpv_end_file_reason:
-        MPV_END_FILE_REASON_EOF = 0
-        MPV_END_FILE_REASON_STOP = 2
-        MPV_END_FILE_REASON_QUIT = 3
-        MPV_END_FILE_REASON_ERROR = 4
+    enum mpv_end_file_reason:
+        MPV_END_FILE_REASON_EOF
+        MPV_END_FILE_REASON_STOP
+        MPV_END_FILE_REASON_QUIT
+        MPV_END_FILE_REASON_ERROR
 
     cdef struct mpv_event_end_file:
         int reason
@@ -271,4 +262,104 @@ cdef extern from "mpv/client.h":
 
     int mpv_get_wakeup_pipe(mpv_handle *ctx) nogil
 
+    void mpv_wait_async_requests(mpv_handle *ctx) nogil
 
+    enum mpv_sub_api:
+        MPV_SUB_API_OPENGL_CB
+
+    void *mpv_get_sub_api(mpv_handle *ctx, mpv_sub_api sub_api) nogil
+
+cdef extern from "mpv/render.h":
+    struct mpv_render_context:
+        pass
+
+    enum mpv_render_param_type:
+        MPV_RENDER_PARAM_INVALID
+        MPV_RENDER_PARAM_API_TYPE
+        MPV_RENDER_PARAM_OPENGL_INIT_PARAMS
+        MPV_RENDER_PARAM_OPENGL_FBO
+        MPV_RENDER_PARAM_FLIP_Y
+        MPV_RENDER_PARAM_DEPTH
+        MPV_RENDER_PARAM_ICC_PROFILE
+        MPV_RENDER_PARAM_AMBIENT_LIGHT
+        MPV_RENDER_PARAM_X11_DISPLAY
+        MPV_RENDER_PARAM_WL_DISPLAY
+        MPV_RENDER_PARAM_ADVANCED_CONTROL
+        MPV_RENDER_PARAM_NEXT_FRAME_INFO
+        MPV_RENDER_PARAM_BLOCK_FOR_TARGET_TIME
+        MPV_RENDER_PARAM_SKIP_RENDERING
+        MPV_RENDER_PARAM_DRM_DISPLAY
+        MPV_RENDER_PARAM_DRM_DRAW_SURFACE_SIZE
+        MPV_RENDER_PARAM_DRM_DISPLAY_V2
+        MPV_RENDER_PARAM_SW_SIZE
+        MPV_RENDER_PARAM_SW_FORMAT
+        MPV_RENDER_PARAM_SW_STRIDE
+        MPV_RENDER_PARAM_SW_POINTER
+
+    char *MPV_RENDER_API_TYPE_OPENGL
+    char *MPV_RENDER_API_TYPE_SW
+
+    enum mpv_render_frame_info_flag:
+        MPV_RENDER_FRAME_INFO_PRESENT
+        MPV_RENDER_FRAME_INFO_REDRAW
+        MPV_RENDER_FRAME_INFO_REPEAT
+        MPV_RENDER_FRAME_INFO_BLOCK_VSYNC
+
+    struct mpv_render_param:
+        mpv_render_param_type type
+        void *data
+
+    struct mpv_render_frame_info:
+        uint64_t flags
+        int64_t target_time
+
+    int mpv_render_context_create(mpv_render_context **res, mpv_handle *mpv,
+                                  mpv_render_param *params) nogil
+
+    int mpv_render_context_set_parameter(mpv_render_context *ctx,
+                                     mpv_render_param param) nogil
+
+    int mpv_render_context_get_info(mpv_render_context *ctx,
+                                    mpv_render_param param) nogil
+
+    ctypedef void (*mpv_render_update_fn)(void *cb_ctx) nogil
+
+    void mpv_render_context_set_update_callback(mpv_render_context *ctx,
+                                                mpv_render_update_fn callback,
+                                                void *callback_ctx) nogil
+
+    uint64_t mpv_render_context_update(mpv_render_context *ctx) nogil
+
+    enum mpv_render_update_flag:
+        MPV_RENDER_UPDATE_FRAME
+
+    int mpv_render_context_render(mpv_render_context *ctx, mpv_render_param *params) nogil
+
+    void mpv_render_context_report_swap(mpv_render_context *ctx) nogil
+
+    void mpv_render_context_free(mpv_render_context *ctx) nogil
+
+cdef extern from "mpv/render_gl.h":
+    struct mpv_opengl_init_params:
+        void *(*get_proc_address)(void *ctx, const char *name)
+        void *get_proc_address_ctx
+
+    struct mpv_opengl_fbo:
+        int fbo
+        int w
+        int h
+        int internal_format
+
+    struct _drmModeAtomicReq:
+        pass
+
+    struct mpv_opengl_drm_params:
+        int fd
+        int crtc_id
+        int connector_id
+        _drmModeAtomicReq **atomic_request_ptr
+        int render_fd
+
+    struct mpv_opengl_drm_draw_surface_size:
+        int width
+        int height

@@ -1,6 +1,32 @@
 pympv
 =====
 
+## 0.8.0
+- Update to libmpv API 2.0, removing previously deprecated APIs
+- Optimise string conversion functions with Cython
+- Give str its Python 3 meaning
+- Simplify string conversions, since python2 is no more
+
+## 0.7.1
+- Extract examples into its own directory
+
+## 0.6.0
+- Add support for the render API
+- Deprecate the legacy opengl-cb API
+
+## 0.5.1
+- Rename async -> asynchronous for Python 3.7 compatibility
+- Force Cython rebuilds if Cython is installed
+
+## 0.4.1
+
+- Prepare packaging for PyPI
+
+## 0.4.0
+- Fix string support in Python2
+- Add opengl-cb support
+- Improve packaging/setup.py
+
 ## 0.3.0
 
 - Fix various failures of data and callbacks
